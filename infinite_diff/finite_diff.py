@@ -1,6 +1,6 @@
 """Classes and functions for numerical analysis."""
 import numpy as np
-import xray
+import xarray as xr
 
 
 class FiniteDiff(object):
@@ -11,7 +11,7 @@ class FiniteDiff(object):
         Create a `FiniteDiff` object.
 
         :param arr: Data to be finite-differenced.
-        :type arr: xray.Dataset or xray.DataArray object
+        :type arr: xarray.Dataset or xarray.DataArray object
         :param str geometry: Geometry of the positions.  Either 'cartesian'
                              or 'spherical'.
         :param vector_field: Whether or not `f` is a component of a vector
@@ -27,36 +27,21 @@ class FiniteDiff(object):
         self.wraparound = wraparound
 
     @staticmethod
-    def fwd_diff1(arr, dim, is_coord=False):
-        """Forward differencing of the array.  Not its full derivative.
-
-        A bug in xray version 0.6.1 and prior causes the `DataArray.diff`
-        method to not work when applied to a coordinate array.  Therefore,
-        a workaround is implemented here and used if the `is_coord` keyword
-        argument is True.
-        """
-        if is_coord:
-            arr_diff = arr[dim].diff(dim, n=1, label='lower')
-            return xray.DataArray(np.diff(arr[dim]), dims=[dim],
-                                  coords=[arr_diff[dim]])
+    def fwd_diff1(arr, dim):
+        """Forward differencing of the array.  Not its full derivative."""
         return arr.diff(dim, n=1, label='lower')
 
     @staticmethod
-    def bwd_diff1(arr, dim, is_coord=False):
+    def bwd_diff1(arr, dim):
         """Backward differencing of the array.  Not its full derivative."""
-        if is_coord:
-            arr_diff = arr[dim].diff(dim, n=1, label='upper')
-            return xray.DataArray(np.diff(arr[dim]), dims=[dim],
-                                  coords=[arr_diff[dim]])
         return arr.diff(dim, n=1, label='upper')
 
     @classmethod
-    def cen_diff(cls, arr, dim, spacing=1, is_coord=False,
-                 do_edges_one_sided=False):
+    def cen_diff(cls, arr, dim, spacing=1, do_edges_one_sided=False):
         """Centered differencing of the DataArray or Dataset.
 
         :param arr: Data to be center-differenced.
-        :type arr: `xray.DataArray` or `xray.Dataset`
+        :type arr: `xarray.DataArray` or `xarray.Dataset`
         :param str dim: Dimension over which to perform the differencing.
         :param int spacing: How many gridpoints over to use.  Size of resulting
                             array depends on this value.
@@ -75,14 +60,13 @@ class FiniteDiff(object):
         left = arr.isel(**{dim: slice(0, -spacing)})
         right = arr.isel(**{dim: slice(spacing, None)})
         # Centered differencing = sum of intermediate forward differences
-        diff = (cls.fwd_diff1(right, dim, is_coord=is_coord) +
-                cls.bwd_diff1(left, dim, is_coord=is_coord))
+        diff = cls.fwd_diff1(right, dim) + cls.bwd_diff1(left, dim)
         if do_edges_one_sided:
             left = arr.isel(**{dim: slice(0, 2)})
             right = arr.isel(**{dim: slice(-2, None)})
-            diff_left = cls.fwd_diff1(left, dim, is_coord=is_coord)
-            diff_right = cls.bwd_diff1(right, dim, is_coord=is_coord)
-            diff = xray.concat([diff_left, diff, diff_right], dim=dim)
+            diff_left = cls.fwd_diff1(left, dim)
+            diff_right = cls.bwd_diff1(right, dim)
+            diff = xr.concat([diff_left, diff, diff_right], dim=dim)
         return diff
 
     @classmethod
@@ -97,8 +81,7 @@ class FiniteDiff(object):
         :out: Array containing the df/dx approximation, with length in the 0th
               axis one less than that of the input array.
         """
-        return (cls.fwd_diff1(arr, dim, is_coord=False) /
-                cls.fwd_diff1(arr[dim], dim, is_coord=True))
+        return cls.fwd_diff1(arr, dim) / cls.fwd_diff1(arr[dim], dim)
 
     @classmethod
     def bwd_diff_deriv(cls, arr, dim):
@@ -112,8 +95,7 @@ class FiniteDiff(object):
         :out: Array containing the df/dx approximation, with length in the 0th
               axis one less than that of the input array.
         """
-        return (cls.bwd_diff1(arr, dim, is_coord=False) /
-                cls.bwd_diff1(arr[dim], dim, is_coord=True))
+        return cls.bwd_diff1(arr, dim) / cls.bwd_diff1(arr[dim], dim)
 
     @classmethod
     def cen_diff_deriv(cls, arr, dim, order=2, do_edges_one_sided=False):
@@ -121,7 +103,7 @@ class FiniteDiff(object):
         Centered differencing approximation of 1st derivative.
 
         :param arr: Data to be center-differenced.
-        :type arr: `xray.DataArray` or `xray.Dataset`
+        :type arr: `xarray.DataArray` or `xarray.Dataset`
         :param str dim: Dimension over which to compute.
         :param int order: Order of accuracy to use.  Default 2.
         :param do_edges_one_sided: Whether or not to fill in the edge cells
@@ -137,9 +119,9 @@ class FiniteDiff(object):
         if order != 2:
             raise NotImplementedError("Centered differencing of df/dx only "
                                       "supported for 2nd order currently")
-        return (cls.cen_diff(arr, dim, spacing=1, is_coord=False,
+        return (cls.cen_diff(arr, dim, spacing=1,
                              do_edges_one_sided=do_edges_one_sided) /
-                cls.cen_diff(arr[dim], dim, spacing=1, is_coord=True,
+                cls.cen_diff(arr[dim], dim, spacing=1,
                              do_edges_one_sided=do_edges_one_sided))
 
     @classmethod
@@ -149,7 +131,7 @@ class FiniteDiff(object):
 
         :param flow: Flow that is advecting the field.
         """
-        flow_pos = np.ma.where(flow >= 0., flow, 0)
-        flow_neg = np.ma.where(flow < 0., flow, 0)
+        flow_pos = flow.where(flow >= 0)
+        flow_neg = flow.where(flow < 0)
         return (flow_pos*cls.bwd_diff_deriv(arr, dim, order=order) +
                 flow_neg*cls.fwd_diff_deriv(arr, dim, order=order))
