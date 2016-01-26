@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from finite_diff import FiniteDiff
+from infinite_diff import FiniteDiff
 
 
 class FiniteDiffTestCase(unittest.TestCase):
