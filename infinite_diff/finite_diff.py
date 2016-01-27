@@ -1,5 +1,4 @@
 """Classes and functions for numerical analysis."""
-import numpy as np
 import xarray as xr
 
 
@@ -70,41 +69,56 @@ class FiniteDiff(object):
         return diff
 
     @classmethod
-    def fwd_diff_deriv(cls, arr, dim):
+    def fwd_diff_deriv(cls, arr, dim, coord=None, order=1):
         """1st order accurate forward differencing approximation of derivative.
 
         :param arr: Field to take derivative of.
-        :param str dim: Values of dimension over which derivative is taken.  If
-                        a singleton, assumed to be the uniform spacing.  If an
-                        array, assumed to be the values themselves, not the
-                        spacing, and must be the same length as `arr`.
+        :param str dim: Name of dimension over which to take the derivative.
+        :param xarray.DataArray coord: Coordinate array to use for the
+            denominator.  If not given, arr[dim] is used.
         :out: Array containing the df/dx approximation, with length in the 0th
-              axis one less than that of the input array.
+            axis one less than that of the input array.
         """
-        return cls.fwd_diff1(arr, dim) / cls.fwd_diff1(arr[dim], dim)
+        if order != 1:
+            raise NotImplementedError("Forward differencing of df/dx only "
+                                      "supported for 1st order currently")
+        if coord is None:
+            arr_coord = arr[dim]
+        else:
+            arr_coord = coord
+        return cls.fwd_diff1(arr, dim) / cls.fwd_diff1(arr_coord, dim)
 
     @classmethod
-    def bwd_diff_deriv(cls, arr, dim):
+    def bwd_diff_deriv(cls, arr, dim, coord=None, order=1):
         """1st order accurate backward differencing approx of derivative.
 
         :param arr: Field to take derivative of.
-        :param str dim: Values of dimension over which derivative is taken.  If
-                        a singleton, assumed to be the uniform spacing.  If an
-                        array, assumed to be the values themselves, not the
-                        spacing, and must be the same length as `arr`.
+        :param str dim: Name of dimension over which to take the derivative.
+        :param xarray.DataArray coord: Coordinate array to use for the
+            denominator.  If not given, arr[dim] is used.
         :out: Array containing the df/dx approximation, with length in the 0th
               axis one less than that of the input array.
         """
-        return cls.bwd_diff1(arr, dim) / cls.bwd_diff1(arr[dim], dim)
+        if order != 1:
+            raise NotImplementedError("Backward differencing of df/dx only "
+                                      "supported for 1st order currently")
+        if coord is None:
+            arr_coord = arr[dim]
+        else:
+            arr_coord = coord
+        return cls.bwd_diff1(arr, dim) / cls.bwd_diff1(arr_coord, dim)
 
     @classmethod
-    def cen_diff_deriv(cls, arr, dim, order=2, do_edges_one_sided=False):
+    def cen_diff_deriv(cls, arr, dim, coord=None, order=2,
+                       do_edges_one_sided=False):
         """
         Centered differencing approximation of 1st derivative.
 
         :param arr: Data to be center-differenced.
         :type arr: `xarray.DataArray` or `xarray.Dataset`
         :param str dim: Dimension over which to compute.
+        :param xarray.DataArray coord: Coordinate array to use for the
+            denominator.  If not given or None, arr[dim] is used.
         :param int order: Order of accuracy to use.  Default 2.
         :param do_edges_one_sided: Whether or not to fill in the edge cells
                                    that don't have the needed neighbor cells
@@ -119,19 +133,42 @@ class FiniteDiff(object):
         if order != 2:
             raise NotImplementedError("Centered differencing of df/dx only "
                                       "supported for 2nd order currently")
-        return (cls.cen_diff(arr, dim, spacing=1,
-                             do_edges_one_sided=do_edges_one_sided) /
-                cls.cen_diff(arr[dim], dim, spacing=1,
-                             do_edges_one_sided=do_edges_one_sided))
+        numer = cls.cen_diff(arr, dim, spacing=1,
+                             do_edges_one_sided=do_edges_one_sided)
+        denom = cls.cen_diff(arr[dim], dim, spacing=1,
+                             do_edges_one_sided=do_edges_one_sided)
+        return numer / denom
 
     @classmethod
-    def upwind_advection(cls, arr, flow, dim, order=1):
+    def upwind_advec(cls, arr, flow, dim, coord=None, order=1,
+                     wraparound=False):
         """
         Upwind differencing scheme for advection.
 
+        :param arr: Field being advected.
         :param flow: Flow that is advecting the field.
         """
-        flow_pos = flow.where(flow >= 0)
-        flow_neg = flow.where(flow < 0)
-        return (flow_pos*cls.bwd_diff_deriv(arr, dim, order=order) +
-                flow_neg*cls.fwd_diff_deriv(arr, dim, order=order))
+        flow_pos = flow.copy()
+        flow_pos.values[flow.values < 0] = 0.
+        flow_neg = flow.copy()
+        flow_neg.values[flow.values >= 0] = 0.
+        fwd = cls.bwd_diff_deriv(arr, dim, coord=coord, order=order)
+        bwd = cls.fwd_diff_deriv(arr, dim, coord=coord, order=order)
+        interior = flow_pos*bwd + flow_neg*fwd
+        # If array has wraparound values, no special edge handling needed.
+        if wraparound:
+            return interior
+        # Edge cases can't do upwind.
+        if coord is None:
+            coord_left = None
+            coord_right = None
+        else:
+            coord_left = coord.isel(**{dim: 0})
+            coord_right = coord.isel(**{dim: -1})
+        left_edge = flow.isel(**{dim: 0}) * cls.fwd_diff_deriv(
+            arr.isel(**{dim: 0}), dim, coord=coord_left, order=order
+        )
+        right_edge = flow.isel(**{dim: -1}) * cls.bwd_diff_deriv(
+            arr.isel(**{dim: -1}), dim, coord=coord_right, order=order
+        )
+        return xr.concat([left_edge, interior, right_edge], dim=dim)
