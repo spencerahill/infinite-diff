@@ -35,6 +35,25 @@ class FiniteDiff(object):
         """Backward differencing of the array.  Not its full derivative."""
         return arr.diff(dim, n=1, label='upper')
 
+    @staticmethod
+    def fwd_diff(arr, dim, spacing=1):
+        """Forward differencing of the array."""
+        left = arr.isel(**{dim: slice(0, -spacing)})
+        right = arr.isel(**{dim: slice(spacing, None)})
+        return xr.DataArray(right.values, dims=right.dims,
+                            coords=left.coords) - left
+
+    @staticmethod
+    def cen_diff4(arr, dim):
+        """4th order accurate centered differencing."""
+        if isinstance(dim, (float, int)):
+            dx = dim
+            return (8*(arr[3:-1] - arr[1:-3]) - (arr[4:] - arr[:-4])) / (12.*dx)
+        else:
+            df_dx1 = (arr[3:-1] - arr[1:-3]) / (dim[3:-1] - dim[1:-3])
+            df_dx2 = (arr[4:] - arr[:-4]) / (dim[4:] - dim[:-4])
+            return (8.*df_dx1 - df_dx2) / 12.
+
     @classmethod
     def cen_diff(cls, arr, dim, spacing=1, do_edges_one_sided=False):
         """Centered differencing of the DataArray or Dataset.
@@ -68,6 +87,12 @@ class FiniteDiff(object):
             diff = xr.concat([diff_left, diff, diff_right], dim=dim)
         return diff
 
+    @staticmethod
+    def arr_coord(arr, dim, coord=None):
+        if coord is None:
+            return arr[dim]
+        return coord
+
     @classmethod
     def fwd_diff_deriv(cls, arr, dim, coord=None, order=1):
         """1st order accurate forward differencing approximation of derivative.
@@ -82,10 +107,7 @@ class FiniteDiff(object):
         if order != 1:
             raise NotImplementedError("Forward differencing of df/dx only "
                                       "supported for 1st order currently")
-        if coord is None:
-            arr_coord = arr[dim]
-        else:
-            arr_coord = coord
+        arr_coord = cls.arr_coord(arr, dim, coord=coord)
         return cls.fwd_diff1(arr, dim) / cls.fwd_diff1(arr_coord, dim)
 
     @classmethod
@@ -102,11 +124,48 @@ class FiniteDiff(object):
         if order != 1:
             raise NotImplementedError("Backward differencing of df/dx only "
                                       "supported for 1st order currently")
-        if coord is None:
-            arr_coord = arr[dim]
-        else:
-            arr_coord = coord
+        arr_coord = cls.arr_coord(arr, dim, coord=coord)
         return cls.bwd_diff1(arr, dim) / cls.bwd_diff1(arr_coord, dim)
+
+    @classmethod
+    def fwd_diff_deriv2(cls, arr, dim, coord=None):
+        """2nd order forward differencing approximation of derivative.
+
+        :param arr: Field to take derivative of.
+        :param str dim: Name of dimension over which to take the derivative.
+        :param xarray.DataArray coord: Coordinate array to use for the
+            denominator.  If not given, arr[dim] is used.
+        :out: Array containing the df/dx approximation, with length in the 0th
+            axis one less than that of the input array.
+        """
+        arr_coord = cls.arr_coord(arr, dim, coord=coord)
+        darr_ddim1 = cls.fwd_diff_deriv(
+            arr.isel(**{dim: slice(1, None)}), dim,
+            coord=arr_coord.isel(**{dim: slice(1, None)}), order=1
+        )
+        darr_ddim2 = (cls.fwd_diff(arr, dim, spacing=2) /
+                      cls.fwd_diff(arr_coord, dim, spacing=2))
+        return 2.*darr_ddim1 - darr_ddim2
+
+    @classmethod
+    def bwd_diff_deriv2(cls, arr, dim, coord=None):
+        """2nd order backward differencing approximation of derivative.
+
+        :param arr: Field to take derivative of.
+        :param str dim: Name of dimension over which to take the derivative.
+        :param xarray.DataArray coord: Coordinate array to use for the
+            denominator.  If not given, arr[dim] is used.
+        :out: Array containing the df/dx approximation, with length in the 0th
+            axis one less than that of the input array.
+        """
+        arr_coord = cls.arr_coord(arr, dim, coord=coord)
+        darr_ddim1 = cls.bwd_diff_deriv(
+            arr.isel(**{dim: slice(None, -1)}), dim,
+            coord=arr_coord.isel(**{dim: slice(None, -1)}), order=1
+        )
+        darr_ddim2 = (cls.bwd_diff(arr, dim, spacing=2) /
+                      cls.bwd_diff(arr_coord, dim, spacing=2))
+        return 2.*darr_ddim1 - darr_ddim2
 
     @classmethod
     def cen_diff_deriv(cls, arr, dim, coord=None, order=2,
@@ -121,21 +180,23 @@ class FiniteDiff(object):
             denominator.  If not given or None, arr[dim] is used.
         :param int order: Order of accuracy to use.  Default 2.
         :param do_edges_one_sided: Whether or not to fill in the edge cells
-                                   that don't have the needed neighbor cells
-                                   for the stencil.  If `True`, use one-sided
-                                   differencing with the same order of accuracy
-                                   as `order`, and the outputted array is the
-                                   same shape as `arr`.
+            that don't have the needed neighbor cells for the stencil.  If
+            `True`, use one-sided differencing with the same order of accuracy
+            as `order`, and the outputted array is the same shape as `arr`.
 
-                                   If `False`, the outputted array has a length
-                                   in the computed axis reduced by `order`.
+            If `False`, the outputted array has a length in the computed axis
+            reduced by `order`.
         """
         if order != 2:
             raise NotImplementedError("Centered differencing of df/dx only "
                                       "supported for 2nd order currently")
+        if coord is None:
+            arr_coord = arr[dim]
+        else:
+            arr_coord = coord
         numer = cls.cen_diff(arr, dim, spacing=1,
                              do_edges_one_sided=do_edges_one_sided)
-        denom = cls.cen_diff(arr[dim], dim, spacing=1,
+        denom = cls.cen_diff(arr_coord, dim, spacing=1,
                              do_edges_one_sided=do_edges_one_sided)
         return numer / denom
 
