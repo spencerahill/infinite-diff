@@ -43,16 +43,31 @@ class FiniteDiff(object):
         return xr.DataArray(right.values, dims=right.dims,
                             coords=left.coords) - left
 
-    @staticmethod
-    def cen_diff4(arr, dim):
-        """4th order accurate centered differencing."""
-        if isinstance(dim, (float, int)):
-            dx = dim
-            return (8*(arr[3:-1] - arr[1:-3]) - (arr[4:] - arr[:-4])) / (12.*dx)
-        else:
-            df_dx1 = (arr[3:-1] - arr[1:-3]) / (dim[3:-1] - dim[1:-3])
-            df_dx2 = (arr[4:] - arr[:-4]) / (dim[4:] - dim[:-4])
-            return (8.*df_dx1 - df_dx2) / 12.
+    @classmethod
+    def bwd_diff(cls, arr, dim, spacing=1):
+        """Backward differencing of the array."""
+        return cls.fwd_diff(arr.isel(**{dim: slice(-1, None, -1)}), dim,
+                            spacing=spacing).isel(**{dim: slice(-1, None, -1)})
+
+    # @staticmethod
+    # def cen_diff4(arr, dim):
+    #     """4th order accurate centered differencing."""
+    #     if isinstance(dim, (float, int)):
+    #         dx = dim
+    #         return (8*(arr[3:-1] - arr[1:-3]) - (arr[4:] - arr[:-4])) / (12.*dx)
+    #     else:
+    #         df_dx1 = (arr[3:-1] - arr[1:-3]) / (dim[3:-1] - dim[1:-3])
+    #         df_dx2 = (arr[4:] - arr[:-4]) / (dim[4:] - dim[:-4])
+    #         return (8.*df_dx1 - df_dx2) / 12.
+
+    @classmethod
+    def edges_one_sided(cls, arr, dim, order=1):
+        """One-sided differencing on array edges."""
+        left = arr.isel(**{dim: slice(0, 2)})
+        right = arr.isel(**{dim: slice(-2, None)})
+        diff_left = cls.fwd_diff1(left, dim)
+        diff_right = cls.bwd_diff1(right, dim)
+        return diff_left, diff_right
 
     @classmethod
     def cen_diff(cls, arr, dim, spacing=1, do_edges_one_sided=False):
@@ -80,15 +95,13 @@ class FiniteDiff(object):
         # Centered differencing = sum of intermediate forward differences
         diff = cls.fwd_diff1(right, dim) + cls.bwd_diff1(left, dim)
         if do_edges_one_sided:
-            left = arr.isel(**{dim: slice(0, 2)})
-            right = arr.isel(**{dim: slice(-2, None)})
-            diff_left = cls.fwd_diff1(left, dim)
-            diff_right = cls.bwd_diff1(right, dim)
+            diff_left, diff_right = cls.edges_one_sided(arr, dim)
             diff = xr.concat([diff_left, diff, diff_right], dim=dim)
         return diff
 
     @staticmethod
     def arr_coord(arr, dim, coord=None):
+        """Get the coord to be used as the denominator for a derivative."""
         if coord is None:
             return arr[dim]
         return coord
@@ -128,7 +141,7 @@ class FiniteDiff(object):
         return cls.bwd_diff1(arr, dim) / cls.bwd_diff1(arr_coord, dim)
 
     @classmethod
-    def fwd_diff_deriv2(cls, arr, dim, coord=None):
+    def fwd_diff2_deriv(cls, arr, dim, coord=None):
         """2nd order forward differencing approximation of derivative.
 
         :param arr: Field to take derivative of.
@@ -148,7 +161,7 @@ class FiniteDiff(object):
         return 2.*darr_ddim1 - darr_ddim2
 
     @classmethod
-    def bwd_diff_deriv2(cls, arr, dim, coord=None):
+    def bwd_diff2_deriv(cls, arr, dim, coord=None):
         """2nd order backward differencing approximation of derivative.
 
         :param arr: Field to take derivative of.
@@ -209,6 +222,9 @@ class FiniteDiff(object):
         :param arr: Field being advected.
         :param flow: Flow that is advecting the field.
         """
+        if order == 2:
+            return cls.upwind_advec2(arr, flow, dim, coord=coord,
+                                     wraparound=wraparound)
         flow_pos = flow.copy()
         flow_pos.values[flow.values < 0] = 0.
         flow_neg = flow.copy()
@@ -231,5 +247,41 @@ class FiniteDiff(object):
         )
         right_edge = flow.isel(**{dim: -1}) * cls.bwd_diff_deriv(
             arr.isel(**{dim: -1}), dim, coord=coord_right, order=order
+        )
+        return xr.concat([left_edge, interior, right_edge], dim=dim)
+
+    @classmethod
+    def upwind_advec2(cls, arr, flow, dim, coord=None, wraparound=False):
+        """
+        Upwind differencing scheme for advection with 2nd order accuracy.
+
+        :param arr: Field being advected.
+        :param flow: Flow that is advecting the field.
+        """
+        flow_pos = flow.copy()
+        flow_pos.values[flow.values < 0] = 0.
+        flow_neg = flow.copy()
+        flow_neg.values[flow.values >= 0] = 0.
+        fwd = cls.bwd_diff2_deriv(arr, dim, coord=coord)
+        bwd = cls.fwd_diff2_deriv(arr, dim, coord=coord)
+        interior = flow_pos*bwd + flow_neg*fwd
+        # If array has wraparound values, no special edge handling needed.
+        if wraparound:
+            return interior
+        # Edge cases can't do upwind.
+        order = 2
+        slice_left = {dim: slice(0, order)}
+        slice_right = {dim: slice(-order, None)}
+        if coord is None:
+            coord_left = None
+            coord_right = None
+        else:
+            coord_left = coord.isel(**slice_left)
+            coord_right = coord.isel(**slice_right)
+        left_edge = flow.isel(**slice_left) * cls.fwd_diff_deriv(
+            arr.isel(**slice_left), dim, coord=coord_left
+        )
+        right_edge = flow.isel(**slice_right) * cls.bwd_diff_deriv(
+            arr.isel(**slice_right), dim, coord=coord_right
         )
         return xr.concat([left_edge, interior, right_edge], dim=dim)
