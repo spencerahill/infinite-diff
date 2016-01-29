@@ -28,7 +28,7 @@ class FiniteDiff(object):
     @staticmethod
     def fwd_diff(arr, dim, spacing=1):
         """Forward differencing of the array."""
-        if spacing == 0:
+        if spacing < 1:
             raise ValueError("'spacing' value of {} invalid; spacing "
                              "must be positive integer".format(spacing))
         if len(arr[dim]) < spacing + 1:
@@ -48,22 +48,12 @@ class FiniteDiff(object):
         ).isel(**{dim: slice(-1, None, -1)})
 
     @classmethod
-    def fwd_diff1(cls, arr, dim):
-        """Forward differencing of the array."""
-        return cls.fwd_diff(arr, dim, spacing=1)
-
-    @classmethod
-    def bwd_diff1(cls, arr, dim):
-        """Backward differencing of the array."""
-        return cls.bwd_diff(arr, dim, spacing=1)
-
-    @classmethod
     def edges_one_sided(cls, arr, dim, order=1):
         """One-sided differencing on array edges."""
         left = arr.isel(**{dim: slice(0, 2)})
         right = arr.isel(**{dim: slice(-2, None)})
-        diff_left = cls.fwd_diff1(left, dim)
-        diff_right = cls.bwd_diff1(right, dim)
+        diff_left = cls.fwd_diff(left, dim)
+        diff_right = cls.bwd_diff(right, dim)
         return diff_left, diff_right
 
     @classmethod
@@ -90,7 +80,7 @@ class FiniteDiff(object):
         left = arr.isel(**{dim: slice(0, -spacing)})
         right = arr.isel(**{dim: slice(spacing, None)})
         # Centered differencing = sum of intermediate forward differences
-        diff = cls.fwd_diff1(right, dim) + cls.bwd_diff1(left, dim)
+        diff = cls.fwd_diff(right, dim) + cls.bwd_diff(left, dim)
         if do_edges_one_sided:
             diff_left, diff_right = cls.edges_one_sided(arr, dim)
             diff = xr.concat([diff_left, diff, diff_right], dim=dim)
@@ -118,7 +108,7 @@ class FiniteDiff(object):
             raise NotImplementedError("Forward differencing of df/dx only "
                                       "supported for 1st order currently")
         arr_coord = cls.arr_coord(arr, dim, coord=coord)
-        return cls.fwd_diff1(arr, dim) / cls.fwd_diff1(arr_coord, dim)
+        return cls.fwd_diff(arr, dim) / cls.fwd_diff(arr_coord, dim)
 
     @classmethod
     def bwd_diff_deriv(cls, arr, dim, coord=None, order=1):
@@ -135,7 +125,7 @@ class FiniteDiff(object):
             raise NotImplementedError("Backward differencing of df/dx only "
                                       "supported for 1st order currently")
         arr_coord = cls.arr_coord(arr, dim, coord=coord)
-        return cls.bwd_diff1(arr, dim) / cls.bwd_diff1(arr_coord, dim)
+        return cls.bwd_diff(arr, dim) / cls.bwd_diff(arr_coord, dim)
 
     @classmethod
     def fwd_diff2_deriv(cls, arr, dim, coord=None):
