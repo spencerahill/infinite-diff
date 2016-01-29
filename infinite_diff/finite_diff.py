@@ -2,6 +2,28 @@
 import xarray as xr
 
 
+def _check_spacing(spacing, min_spacing=1):
+    """Ensure spacing value is valid."""
+    msg = ("'spacing' value of {} invalid; spacing must be positive "
+           "integer".format(spacing))
+    if not isinstance(spacing, int):
+        raise TypeError(msg)
+    if spacing < min_spacing:
+        raise ValueError(msg)
+
+
+def _check_arr_len(arr, dim, spacing, pad=1):
+    """Ensure array is long enough to perform the differencing."""
+    try:
+        len_arr_dim = len(arr[dim])
+    except TypeError:
+        len_arr_dim = 0
+    if len_arr_dim < spacing + pad:
+        raise ValueError("Array along dim '{}' is too small for "
+                         "differencing with "
+                         "spacing {}".format(dim, spacing))
+
+
 class FiniteDiff(object):
     """For numerical approximations of derivatives using finite differences."""
     def __init__(self, arr, geometry='spherical',
@@ -28,17 +50,8 @@ class FiniteDiff(object):
     @staticmethod
     def fwd_diff(arr, dim, spacing=1):
         """Forward differencing of the array."""
-        if spacing < 1:
-            raise ValueError("'spacing' value of {} invalid; spacing "
-                             "must be positive integer".format(spacing))
-        try:
-            len_arr_dim = len(arr[dim])
-        except TypeError:
-            len_arr_dim = 0
-        if len_arr_dim < spacing + 1:
-            raise ValueError("Array along dim '{}' is too small for "
-                             "differencing with "
-                             "spacing {}".format(dim, spacing))
+        _check_spacing(spacing)
+        _check_arr_len(arr, dim, spacing)
         left = arr.isel(**{dim: slice(0, -spacing)})
         right = arr.isel(**{dim: slice(spacing, None)})
         return xr.DataArray(right.values, dims=right.dims,
@@ -79,8 +92,8 @@ class FiniteDiff(object):
                                    If `False`, the outputted array has a length
                                    in the computed axis reduced by `order`.
         """
-        if spacing < 1:
-            raise ValueError("Centered differencing cannot have spacing < 1")
+        _check_spacing(spacing)
+        _check_arr_len(arr, dim, spacing, pad=2)
         left = arr.isel(**{dim: slice(0, -spacing)})
         right = arr.isel(**{dim: slice(spacing, None)})
         # Centered differencing = sum of intermediate forward differences

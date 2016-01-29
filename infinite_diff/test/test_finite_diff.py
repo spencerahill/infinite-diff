@@ -37,6 +37,8 @@ class TestFwdDiff(FwdDiffTestCase):
     def test_bad_spacing(self):
         self.assertRaises(ValueError, self.method, self.ones, self.dim,
                           **{'spacing': 0})
+        self.assertRaises(TypeError, self.method, self.ones, self.dim,
+                          **{'spacing': 1.1})
 
     def test_bad_array_len(self):
         for n in range(len(self.ones[self.dim])):
