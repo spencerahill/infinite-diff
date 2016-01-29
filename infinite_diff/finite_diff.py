@@ -28,6 +28,13 @@ class FiniteDiff(object):
     @staticmethod
     def fwd_diff(arr, dim, spacing=1):
         """Forward differencing of the array."""
+        if spacing == 0:
+            raise ValueError("'spacing' value of {} invalid; spacing "
+                             "must be positive integer".format(spacing))
+        if len(arr[dim]) < spacing + 1:
+            raise ValueError("Array along dim '{}' is too small "
+                             "for differencing with "
+                             "spacing {}".format(dim, spacing))
         left = arr.isel(**{dim: slice(0, -spacing)})
         right = arr.isel(**{dim: slice(spacing, None)})
         return xr.DataArray(right.values, dims=right.dims,
@@ -48,17 +55,6 @@ class FiniteDiff(object):
     def bwd_diff1(cls, arr, dim):
         """Backward differencing of the array."""
         return cls.bwd_diff(arr, dim, spacing=1)
-
-    # @staticmethod
-    # def cen_diff4(arr, dim):
-    #     """4th order accurate centered differencing."""
-    #     if isinstance(dim, (float, int)):
-    #         dx = dim
-    #         return (8*(arr[3:-1] - arr[1:-3]) - (arr[4:] - arr[:-4])) / (12.*dx)
-    #     else:
-    #         df_dx1 = (arr[3:-1] - arr[1:-3]) / (dim[3:-1] - dim[1:-3])
-    #         df_dx2 = (arr[4:] - arr[:-4]) / (dim[4:] - dim[:-4])
-    #         return (8.*df_dx1 - df_dx2) / 12.
 
     @classmethod
     def edges_one_sided(cls, arr, dim, order=1):
