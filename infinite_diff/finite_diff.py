@@ -120,12 +120,25 @@ class FiniteDiff(object):
         :out: Array containing the df/dx approximation, with length in the 0th
             axis one less than that of the input array.
         """
-        if order != 1:
-            raise NotImplementedError("Forward differencing of df/dx only "
-                                      "supported for 1st order currently")
         arr_coord = cls.arr_coord(arr, dim, coord=coord)
-        return (cls.fwd_diff(arr, dim, spacing=spacing) /
-                cls.fwd_diff(arr_coord, dim, spacing=spacing))
+        if order == 1:
+            return (cls.fwd_diff(arr, dim, spacing=spacing) /
+                    cls.fwd_diff(arr_coord, dim, spacing=spacing))
+        elif order == 2:
+            # Formula is 2*fwd_diff(spacing=1) - fwd_diff(spacing=2)
+            # But have to truncate fwd_diff(spacing=1) to be on same grid as
+            # fwd_diff(spacing=2)
+            trunc = {dim: slice(0, -spacing)}
+            return (2*cls.fwd_diff_deriv(arr.isel(**trunc), dim,
+                                         coord=arr_coord.isel(**trunc),
+                                         spacing=spacing, order=1) -
+                    cls.fwd_diff_deriv(arr, dim, coord=arr_coord,
+                                       spacing=2*spacing, order=1))
+        raise NotImplementedError("Forward differencing derivative only "
+                                  "supported for 1st and 2nd order currently")
+
+
+
 
     @classmethod
     def bwd_diff_deriv(cls, arr, dim, coord=None, order=1):

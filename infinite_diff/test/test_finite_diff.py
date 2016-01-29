@@ -81,13 +81,35 @@ class CenDiffTestCase(FiniteDiffTestCase):
 
 
 class TestCenDiff(CenDiffTestCase):
-    def setUp(self):
-        super(TestCenDiff, self).setUp()
-
     def test_bad_array_len(self):
         self.assertRaises(ValueError, self.method, self.ones,
                           self.dim, **{'spacing': 5})
         self.assertRaises(ValueError, self.method, self.ones[0], self.dim)
+
+
+class FwdDiffDerivTestCase(FiniteDiffTestCase):
+    def setUp(self):
+        super(FwdDiffDerivTestCase, self).setUp()
+        self.method = FiniteDiff.fwd_diff_deriv
+
+
+class TestFwdDiffDeriv(FwdDiffDerivTestCase):
+    def test_constant_slope(self, order=1):
+        for n, arange in enumerate(self.arange_trunc[:-1]):
+            # Array len gets progressively smaller.
+            ans = self.method(arange, self.dim, coord=None, spacing=1,
+                              order=order)
+            np.testing.assert_array_equal(ans, self.ones_trunc[n+order])
+            # Spacing of differencing gets progressively larger.
+            ans = self.method(self.arange, self.dim, coord=None, spacing=n+1,
+                              order=order)
+            np.testing.assert_array_equal(ans, self.ones_trunc[n+order])
+
+    def test_constant_slope_order2(self):
+        for n, arange in enumerate(self.arange_trunc[:-2]):
+            # Array len gets progressively smaller.
+            ans = self.method(arange, self.dim, coord=None, spacing=1, order=2)
+            np.testing.assert_array_equal(ans, self.ones_trunc[n+2])
 
 
 # TODO: non-constant slope for fwd/bwd
