@@ -43,6 +43,7 @@ class TestFwdDiff(FwdDiffTestCase):
             self.assertRaises(ValueError, self.method,
                               self.ones_trunc[n], self.dim,
                               **{'spacing': self._array_len - n})
+        # TODO: array len not defined, such that len(arr[dim]) throws TypeError
 
     def test_zero_slope(self):
         for n, zeros in enumerate(self.zeros_trunc[1:]):
@@ -70,3 +71,20 @@ class TestBwdDiff(TestFwdDiff):
     def setUp(self):
         super(TestBwdDiff, self).setUp()
         self.method = FiniteDiff.bwd_diff
+
+
+class CenDiffTestCase(FiniteDiffTestCase):
+    def setUp(self):
+        super(CenDiffTestCase, self).setUp()
+
+
+class TestCenDiff(CenDiffTestCase):
+    def setUp(self):
+        super(TestCenDiff, self).setUp()
+        self.method = FiniteDiff.cen_diff
+
+# TODO: non-constant slope for fwd/bwd
+# TODO: tests of getting proper coord values for fwd/bwd
+# TODO: centered differencing tests
+# TODO: derivative tests
+# TODO: upwind advection tests
