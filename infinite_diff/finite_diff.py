@@ -43,8 +43,9 @@ class FiniteDiff(object):
     @classmethod
     def bwd_diff(cls, arr, dim, spacing=1):
         """Backward differencing of the array."""
-        return cls.fwd_diff(arr.isel(**{dim: slice(-1, None, -1)}), dim,
-                            spacing=spacing).isel(**{dim: slice(-1, None, -1)})
+        return -1*cls.fwd_diff(
+            arr.isel(**{dim: slice(-1, None, -1)}), dim, spacing=spacing
+        ).isel(**{dim: slice(-1, None, -1)})
 
     @classmethod
     def fwd_diff1(cls, arr, dim):
