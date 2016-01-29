@@ -65,12 +65,12 @@ class FiniteDiff(object):
         ).isel(**{dim: slice(-1, None, -1)})
 
     @classmethod
-    def edges_one_sided(cls, arr, dim, order=1):
+    def edges_one_sided(cls, arr, dim, spacing_left=1, spacing_right=1):
         """One-sided differencing on array edges."""
-        left = arr.isel(**{dim: slice(0, 2)})
-        right = arr.isel(**{dim: slice(-2, None)})
-        diff_left = cls.fwd_diff(left, dim)
-        diff_right = cls.bwd_diff(right, dim)
+        left = arr.isel(**{dim: slice(0, spacing_left+1)})
+        right = arr.isel(**{dim: slice(-(spacing_right+1), None)})
+        diff_left = cls.fwd_diff(left, dim, spacing=spacing_left)
+        diff_right = cls.bwd_diff(right, dim, spacing=spacing_right)
         return diff_left, diff_right
 
     @classmethod
@@ -94,10 +94,11 @@ class FiniteDiff(object):
         _check_arr_len(arr, dim, 2*spacing)
         left = arr.isel(**{dim: slice(0, -spacing)})
         right = arr.isel(**{dim: slice(spacing, None)})
-        # Centered differencing = sum of intermediate forward differences
         diff = cls.fwd_diff(right, dim) + cls.bwd_diff(left, dim)
         if do_edges_one_sided:
-            diff_left, diff_right = cls.edges_one_sided(arr, dim)
+            diff_left, diff_right = cls.edges_one_sided(arr, dim,
+                                                        spacing_left=spacing,
+                                                        spacing_right=spacing)
             diff = xr.concat([diff_left, diff, diff_right], dim=dim)
         return diff
 
