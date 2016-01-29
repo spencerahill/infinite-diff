@@ -31,10 +31,14 @@ class FiniteDiff(object):
         if spacing < 1:
             raise ValueError("'spacing' value of {} invalid; spacing "
                              "must be positive integer".format(spacing))
-        if len(arr[dim]) < spacing + 1:
-            raise ValueError("Array along dim '{}' is too small "
-                             "for differencing with "
-                             "spacing {}".format(dim, spacing))
+        try:
+            len_arr_dim = len(arr[dim])
+        except TypeError:
+            len_arr_dim = 0
+        if len_arr_dim  < spacing + 1:
+                raise ValueError("Array along dim '{}' is too small "
+                                 "for differencing with "
+                                 "spacing {}".format(dim, spacing))
         left = arr.isel(**{dim: slice(0, -spacing)})
         right = arr.isel(**{dim: slice(spacing, None)})
         return xr.DataArray(right.values, dims=right.dims,
@@ -94,7 +98,7 @@ class FiniteDiff(object):
         return coord
 
     @classmethod
-    def fwd_diff_deriv(cls, arr, dim, coord=None, order=1):
+    def fwd_diff_deriv(cls, arr, dim, coord=None, spacing=1, order=1):
         """1st order accurate forward differencing approximation of derivative.
 
         :param arr: Field to take derivative of.
@@ -108,7 +112,8 @@ class FiniteDiff(object):
             raise NotImplementedError("Forward differencing of df/dx only "
                                       "supported for 1st order currently")
         arr_coord = cls.arr_coord(arr, dim, coord=coord)
-        return cls.fwd_diff(arr, dim) / cls.fwd_diff(arr_coord, dim)
+        return (cls.fwd_diff(arr, dim, spacing=spacing) /
+                cls.fwd_diff(arr_coord, dim, spacing=spacing))
 
     @classmethod
     def bwd_diff_deriv(cls, arr, dim, coord=None, order=1):
@@ -223,17 +228,19 @@ class FiniteDiff(object):
         if wraparound:
             return interior
         # Edge cases can't do upwind.
+        slice_left = {dim: slice(0, order+1)}
+        slice_right = {dim: slice(-(order+1), None)}
         if coord is None:
             coord_left = None
             coord_right = None
         else:
-            coord_left = coord.isel(**{dim: 0})
-            coord_right = coord.isel(**{dim: -1})
+            coord_left = coord.isel(**slice_left)
+            coord_right = coord.isel(**slice_right)
         left_edge = flow.isel(**{dim: 0}) * cls.fwd_diff_deriv(
-            arr.isel(**{dim: 0}), dim, coord=coord_left, order=order
+            arr.isel(**slice_left), dim, coord=coord_left, order=order
         )
         right_edge = flow.isel(**{dim: -1}) * cls.bwd_diff_deriv(
-            arr.isel(**{dim: -1}), dim, coord=coord_right, order=order
+            arr.isel(**slice_right), dim, coord=coord_right, order=order
         )
         return xr.concat([left_edge, interior, right_edge], dim=dim)
 
