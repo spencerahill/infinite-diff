@@ -4,6 +4,7 @@ import sys
 import unittest
 
 import numpy as np
+import xarray as xr
 
 from infinite_diff import FiniteDiff
 
@@ -11,98 +12,50 @@ from infinite_diff import FiniteDiff
 class FiniteDiffTestCase(unittest.TestCase):
     def setUp(self):
         self._array_len = 10
-        self.ones = np.ones(self._array_len)
-        self.ones_trunc1 = self.ones[1:]
-        self.ones_trunc2 = self.ones[2:]
-        self.ones_trunc3 = self.ones[3:]
-        self.ones_trunc4 = self.ones[4:]
-        self.zeros = np.zeros(self._array_len)
-        self.zeros_trunc1 = self.zeros[:-1]
-        self.zeros_trunc2 = self.zeros[:-2]
-        self.zeros_trunc3 = self.zeros[:-3]
-        self.zeros_trunc4 = self.zeros[:-4]
-        self.arange = np.arange(self._array_len)
-        # self.arange_trunc_left = self.arange[1:]
-        # self.arange_trunc_right = self.arange[:-1]
+        self.dim = 'testdim'
+        self.ones = xr.DataArray(np.ones(self._array_len), dims=[self.dim])
+        self.ones_trunc = [self.ones.isel(**{self.dim: slice(n, None)})
+                           for n in range(self._array_len)]
+        self.zeros = xr.DataArray(np.zeros(self._array_len), dims=[self.dim])
+        self.zeros_trunc = [self.zeros.isel(**{self.dim: slice(n, None)})
+                            for n in range(self._array_len)]
+        self.arange = xr.DataArray(np.arange(self._array_len), dims=[self.dim])
+        self.arange_trunc = [self.arange.isel(**{self.dim: slice(n, None)})
+                            for n in range(self._array_len)]
 
     def tearDown(self):
         pass
 
 
+# method = FiniteDiff.fwd_diff
+method = FiniteDiff.bwd_diff
+
+
 class TestFiniteDiff(FiniteDiffTestCase):
-    def test_fwd_diff1_bad_input(self):
-        self.assertRaises(ValueError, FiniteDiff.fwd_diff1,
-                          self.ones, self.ones)
-        self.assertRaises(ValueError, FiniteDiff.fwd_diff1,
-                          self.ones, self.zeros)
-        self.assertRaises(ValueError, FiniteDiff.fwd_diff1, self.ones, 0.)
+    def test_bad_spacing(self):
+        self.assertRaises(ValueError, method, self.ones, self.dim,
+                          **{'spacing': 0})
 
-    def test_fwd_diff1_zero_slope(self):
-        np.testing.assert_array_equal(FiniteDiff.fwd_diff1(self.ones,
-                                                           self.arange),
-                                      self.zeros_trunc1)
-        np.testing.assert_array_equal(FiniteDiff.fwd_diff1(self.zeros,
-                                                           self.arange),
-                                      self.zeros_trunc1)
-        np.testing.assert_array_equal(FiniteDiff.fwd_diff1(self.zeros, 1.),
-                                      self.zeros_trunc1)
+    def test_bad_array_len(self):
+        for n in range(len(self.ones[self.dim])):
+            self.assertRaises(ValueError, method,
+                              self.ones_trunc[n], self.dim,
+                              **{'spacing': self._array_len - n})
 
-    def test_fwd_diff1_constant_slope(self):
-        np.testing.assert_array_equal(FiniteDiff.fwd_diff1(self.arange, 1.),
-                                      self.ones_trunc1)
-        np.testing.assert_array_equal(FiniteDiff.fwd_diff1(self.arange*-2.5,
-                                                           1.),
-                                      self.ones_trunc1*-2.5)
+    def test_zero_slope(self):
+        for n, zeros in enumerate(self.zeros_trunc[1:]):
+            # Array len gets progressively smaller.
+            ans = method(self.ones_trunc[n],
+                         self.dim, spacing=1)
+            np.testing.assert_array_equal(ans, zeros)
+            # Spacing of differencing gets progressively larger.
+            ans = method(self.ones, self.dim, spacing=n+1)
+            np.testing.assert_array_equal(ans, zeros)
 
-    def test_fwd_diff2_zero_slope(self):
-        np.testing.assert_array_equal(FiniteDiff.fwd_diff2(self.ones,
-                                                           self.arange),
-                                      self.zeros_trunc2)
-        np.testing.assert_array_equal(FiniteDiff.fwd_diff2(self.zeros,
-                                                           self.arange),
-                                      self.zeros_trunc2)
-        np.testing.assert_array_equal(FiniteDiff.fwd_diff2(self.zeros, 1.),
-                                      self.zeros_trunc2)
-
-    def test_fwd_diff2_constant_slope(self):
-        np.testing.assert_array_equal(FiniteDiff.fwd_diff2(self.arange, 1.),
-                                      self.ones_trunc2)
-        np.testing.assert_array_equal(FiniteDiff.fwd_diff2(self.arange*-2.5, 1.),
-                                      self.ones_trunc2*-2.5)
-
-    def test_cen_diff2_zero_slope(self):
-        np.testing.assert_array_equal(FiniteDiff.cen_diff2(self.ones,
-                                                           self.arange),
-                                      self.zeros_trunc2)
-        np.testing.assert_array_equal(FiniteDiff.cen_diff2(self.zeros,
-                                                           self.arange),
-                                      self.zeros_trunc2)
-        np.testing.assert_array_equal(FiniteDiff.cen_diff2(self.zeros, 1.),
-                                      self.zeros_trunc2)
-
-    def test_cen_diff2_constant_slope(self):
-        np.testing.assert_array_equal(FiniteDiff.cen_diff2(self.arange, 1.),
-                                      self.ones_trunc2)
-        np.testing.assert_array_equal(FiniteDiff.cen_diff2(self.arange*-2.5,
-                                                           1.),
-                                      self.ones_trunc2*-2.5)
-
-    def test_cen_diff4_zero_slope(self):
-        np.testing.assert_array_equal(FiniteDiff.cen_diff4(self.ones,
-                                                           self.arange),
-                                      self.zeros_trunc4)
-        np.testing.assert_array_equal(FiniteDiff.cen_diff4(self.zeros,
-                                                           self.arange),
-                                      self.zeros_trunc4)
-        np.testing.assert_array_equal(FiniteDiff.cen_diff4(self.zeros, 1.),
-                                      self.zeros_trunc4)
-
-    def test_cen_diff4_constant_slope(self):
-        np.testing.assert_array_equal(FiniteDiff.cen_diff4(self.arange, 1.),
-                                      self.ones_trunc4)
-        np.testing.assert_array_equal(FiniteDiff.cen_diff4(self.arange*-2.5,
-                                                           1.),
-                                      self.ones_trunc4*-2.5)
+    def test_constant_slope(self):
+        for n, arange in enumerate(self.arange_trunc[:-1]):
+            ans = method(arange, self.dim, spacing=1)
+            np.testing.assert_array_equal(ans, self.ones_trunc[n+1])
 
 
 if __name__ == '__main__':
