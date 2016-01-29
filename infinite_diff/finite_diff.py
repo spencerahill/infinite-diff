@@ -26,16 +26,6 @@ class FiniteDiff(object):
         self.wraparound = wraparound
 
     @staticmethod
-    def fwd_diff1(arr, dim):
-        """Forward differencing of the array.  Not its full derivative."""
-        return arr.diff(dim, n=1, label='lower')
-
-    @staticmethod
-    def bwd_diff1(arr, dim):
-        """Backward differencing of the array.  Not its full derivative."""
-        return arr.diff(dim, n=1, label='upper')
-
-    @staticmethod
     def fwd_diff(arr, dim, spacing=1):
         """Forward differencing of the array."""
         left = arr.isel(**{dim: slice(0, -spacing)})
@@ -48,6 +38,16 @@ class FiniteDiff(object):
         """Backward differencing of the array."""
         return cls.fwd_diff(arr.isel(**{dim: slice(-1, None, -1)}), dim,
                             spacing=spacing).isel(**{dim: slice(-1, None, -1)})
+
+    @classmethod
+    def fwd_diff1(cls, arr, dim):
+        """Forward differencing of the array."""
+        return cls.fwd_diff(arr, dim, spacing=1)
+
+    @classmethod
+    def bwd_diff1(cls, arr, dim):
+        """Backward differencing of the array."""
+        return cls.bwd_diff(arr, dim, spacing=1)
 
     # @staticmethod
     # def cen_diff4(arr, dim):
