@@ -81,19 +81,17 @@ class FiniteDiff(object):
         :type arr: `xarray.DataArray` or `xarray.Dataset`
         :param str dim: Dimension over which to perform the differencing.
         :param int spacing: How many gridpoints over to use.  Size of resulting
-                            array depends on this value.
+            array depends on this value.
         :param do_edges_one_sided: Whether or not to fill in the edge cells
-                                   that don't have the needed neighbor cells
-                                   for the stencil.  If `True`, use one-sided
-                                   differencing with the same order of accuracy
-                                   as `order`, and the outputted array is the
-                                   same shape as `arr`.
+            that don't have the needed neighbor cells for the stencil.  If
+            `True`, use one-sided differencing with the same order of accuracy
+            as `order`, and the outputted array is the same shape as `arr`.
 
-                                   If `False`, the outputted array has a length
-                                   in the computed axis reduced by `order`.
+            If `False`, the outputted array has a length in the computed axis
+            reduced by `order`.
         """
         _check_spacing(spacing)
-        _check_arr_len(arr, dim, spacing, pad=2)
+        _check_arr_len(arr, dim, 2*spacing)
         left = arr.isel(**{dim: slice(0, -spacing)})
         right = arr.isel(**{dim: slice(spacing, None)})
         # Centered differencing = sum of intermediate forward differences

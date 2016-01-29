@@ -77,12 +77,18 @@ class TestBwdDiff(TestFwdDiff):
 class CenDiffTestCase(FiniteDiffTestCase):
     def setUp(self):
         super(CenDiffTestCase, self).setUp()
+        self.method = FiniteDiff.cen_diff
 
 
 class TestCenDiff(CenDiffTestCase):
     def setUp(self):
         super(TestCenDiff, self).setUp()
-        self.method = FiniteDiff.cen_diff
+
+    def test_bad_array_len(self):
+        self.assertRaises(ValueError, self.method, self.ones,
+                          self.dim, **{'spacing': 5})
+        self.assertRaises(ValueError, self.method, self.ones[0], self.dim)
+
 
 # TODO: non-constant slope for fwd/bwd
 # TODO: tests of getting proper coord values for fwd/bwd
