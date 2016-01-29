@@ -35,10 +35,10 @@ class FiniteDiff(object):
             len_arr_dim = len(arr[dim])
         except TypeError:
             len_arr_dim = 0
-        if len_arr_dim  < spacing + 1:
-                raise ValueError("Array along dim '{}' is too small "
-                                 "for differencing with "
-                                 "spacing {}".format(dim, spacing))
+        if len_arr_dim < spacing + 1:
+            raise ValueError("Array along dim '{}' is too small for "
+                             "differencing with "
+                             "spacing {}".format(dim, spacing))
         left = arr.isel(**{dim: slice(0, -spacing)})
         right = arr.isel(**{dim: slice(spacing, None)})
         return xr.DataArray(right.values, dims=right.dims,

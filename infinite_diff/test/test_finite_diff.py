@@ -40,10 +40,9 @@ class TestFwdDiff(FwdDiffTestCase):
 
     def test_bad_array_len(self):
         for n in range(len(self.ones[self.dim])):
-            self.assertRaises(ValueError, self.method,
-                              self.ones_trunc[n], self.dim,
-                              **{'spacing': self._array_len - n})
-        # TODO: array len not defined, such that len(arr[dim]) throws TypeError
+            self.assertRaises(ValueError, self.method, self.ones_trunc[n],
+                              self.dim, **{'spacing': self._array_len - n})
+            self.assertRaises(ValueError, self.method, self.ones[0], self.dim)
 
     def test_zero_slope(self):
         for n, zeros in enumerate(self.zeros_trunc[1:]):
