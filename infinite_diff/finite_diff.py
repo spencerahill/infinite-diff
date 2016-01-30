@@ -154,46 +154,6 @@ class FiniteDiff(object):
         ).isel(**{dim: slice(-1, None, -1)})
 
     @classmethod
-    def fwd_diff2_deriv(cls, arr, dim, coord=None):
-        """2nd order forward differencing approximation of derivative.
-
-        :param arr: Field to take derivative of.
-        :param str dim: Name of dimension over which to take the derivative.
-        :param xarray.DataArray coord: Coordinate array to use for the
-            denominator.  If not given, arr[dim] is used.
-        :out: Array containing the df/dx approximation, with length in the 0th
-            axis one less than that of the input array.
-        """
-        arr_coord = cls.arr_coord(arr, dim, coord=coord)
-        darr_ddim1 = cls.fwd_diff_deriv(
-            arr.isel(**{dim: slice(1, None)}), dim,
-            coord=arr_coord.isel(**{dim: slice(1, None)}), order=1
-        )
-        darr_ddim2 = (cls.fwd_diff(arr, dim, spacing=2) /
-                      cls.fwd_diff(arr_coord, dim, spacing=2))
-        return 2.*darr_ddim1 - darr_ddim2
-
-    @classmethod
-    def bwd_diff2_deriv(cls, arr, dim, coord=None):
-        """2nd order backward differencing approximation of derivative.
-
-        :param arr: Field to take derivative of.
-        :param str dim: Name of dimension over which to take the derivative.
-        :param xarray.DataArray coord: Coordinate array to use for the
-            denominator.  If not given, arr[dim] is used.
-        :out: Array containing the df/dx approximation, with length in the 0th
-            axis one less than that of the input array.
-        """
-        arr_coord = cls.arr_coord(arr, dim, coord=coord)
-        darr_ddim1 = cls.bwd_diff_deriv(
-            arr.isel(**{dim: slice(None, -1)}), dim,
-            coord=arr_coord.isel(**{dim: slice(None, -1)}), order=1
-        )
-        darr_ddim2 = (cls.bwd_diff(arr, dim, spacing=2) /
-                      cls.bwd_diff(arr_coord, dim, spacing=2))
-        return 2.*darr_ddim1 - darr_ddim2
-
-    @classmethod
     def cen_diff_deriv(cls, arr, dim, coord=None, order=2,
                        do_edges_one_sided=False):
         """
