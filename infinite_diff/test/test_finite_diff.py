@@ -112,6 +112,11 @@ class TestFwdDiffDeriv(FwdDiffDerivTestCase):
             np.testing.assert_array_equal(ans, self.ones_trunc[n+2])
 
 
+class TestBwdDiffDeriv(TestFwdDiffDeriv):
+    def setUp(self):
+        super(TestBwdDiffDeriv, self).setUp()
+        self.method = FiniteDiff.bwd_diff_deriv
+
 # TODO: non-constant slope for fwd/bwd
 # TODO: tests of getting proper coord values for fwd/bwd
 # TODO: centered differencing tests
