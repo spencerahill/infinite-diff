@@ -12,19 +12,26 @@ from infinite_diff import FiniteDiff
 
 class FiniteDiffTestCase(unittest.TestCase):
     def setUp(self):
-        self._array_len = 10
+        self.array_len = 10
         self.dim = 'testdim'
-        self.ones = xr.DataArray(np.ones(self._array_len), dims=[self.dim])
+        self.dummy_len = 3
+        self.dummy_dim = 'dummydim'
+        self.ones = xr.DataArray(np.ones((self.dummy_len, self.array_len)),
+                                 dims=[self.dummy_dim, self.dim])
         self.ones_trunc = [self.ones.isel(**{self.dim: slice(n, None)})
-                           for n in range(self._array_len)]
-        self.zeros = xr.DataArray(np.zeros(self._array_len), dims=[self.dim])
+                           for n in range(self.array_len)]
+        self.zeros = xr.DataArray(np.zeros(self.ones.shape),
+                                  dims=self.ones.dims)
         self.zeros_trunc = [self.zeros.isel(**{self.dim: slice(n, None)})
-                            for n in range(self._array_len)]
-        self.arange = xr.DataArray(np.arange(self._array_len), dims=[self.dim])
+                            for n in range(self.array_len)]
+        self.arange = xr.DataArray(
+            np.arange(self.array_len*self.dummy_len).reshape(self.ones.shape),
+            dims=self.ones.dims
+        )
         self.arange_trunc = [self.arange.isel(**{self.dim: slice(n, None)})
-                             for n in range(self._array_len)]
-        self.random = xr.DataArray(np.random.random((self._array_len)),
-                                   dims=[self.dim])
+                             for n in range(self.array_len)]
+        self.random = xr.DataArray(np.random.random(self.ones.shape,),
+                                   dims=self.ones.dims)
 
     def tearDown(self):
         pass
@@ -47,8 +54,9 @@ class TestFwdDiff(FwdDiffTestCase):
     def test_bad_array_len(self):
         for n in range(len(self.ones[self.dim])):
             self.assertRaises(ValueError, self.method, self.ones_trunc[n],
-                              self.dim, **{'spacing': self._array_len - n})
-            self.assertRaises(ValueError, self.method, self.ones[0], self.dim)
+                              self.dim, **{'spacing': self.array_len - n})
+            self.assertRaises(ValueError, self.method,
+                              self.ones.isel(**{self.dim: 0}), self.dim)
 
     def test_zero_slope(self):
         for n, zeros in enumerate(self.zeros_trunc[1:]):
@@ -69,7 +77,7 @@ class TestFwdDiff(FwdDiffTestCase):
             np.testing.assert_array_equal(ans, (n+1)*self.ones_trunc[n+1])
 
     def test_output_coords(self):
-        for n in range(self._array_len - 1):
+        for n in range(self.array_len - 1):
             trunc = slice(n+1, None) if self.is_bwd else slice(0, -(n+1))
             np.testing.assert_array_equal(
                 self.random[self.dim].isel(**{self.dim: trunc}),
@@ -94,7 +102,8 @@ class TestCenDiff(CenDiffTestCase):
     def test_bad_array_len(self):
         self.assertRaises(ValueError, self.method, self.ones,
                           self.dim, **{'spacing': 5})
-        self.assertRaises(ValueError, self.method, self.ones[0], self.dim)
+        self.assertRaises(ValueError, self.method,
+                          self.ones.isel(**{self.dim: 0}), self.dim)
 
 
 class FwdDiffDerivTestCase(FiniteDiffTestCase):
@@ -164,7 +173,6 @@ if __name__ == '__main__':
 
 
 # TODO: non-constant slope for fwd/bwd
-# TODO: tests of getting proper coord values for fwd/bwd
 # TODO: centered differencing tests
 # TODO: derivative tests
 # TODO: upwind advection tests
