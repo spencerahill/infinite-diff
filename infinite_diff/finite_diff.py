@@ -182,13 +182,16 @@ class FiniteDiff(object):
             return numer / denom
         elif order == 4:
             # Formula is (4/3)*cen_diff(spacing=1) - (1/3)*cen_diff(spacing=2)
-            return (1./3.) * (4*cls.cen_diff_deriv(
-                arr, dim, spacing=spacing, order=2,
-                do_edges_one_sided=do_edges_one_sided
+            # But have to truncate cen_diff(spacing=1) to be on same grid as
+            # cen_diff(spacing=2)
+            trunc = {dim: slice(spacing, -spacing)}
+            return (4*cls.cen_diff_deriv(
+                arr.isel(**trunc), dim, coord=arr_coord.isel(**trunc),
+                spacing=spacing, order=2, do_edges_one_sided=do_edges_one_sided
             ) - cls.cen_diff_deriv(
-                arr, dim, spacing=2*spacing, order=2,
+                arr, dim, coord=arr_coord, spacing=2*spacing, order=2,
                 do_edges_one_sided=do_edges_one_sided
-            ))
+            )) / 3.
         raise NotImplementedError("Centered differencing only "
                                   "supported for 2nd and 4th order.")
 
