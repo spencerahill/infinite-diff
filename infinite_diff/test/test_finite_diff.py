@@ -4,13 +4,14 @@ import itertools
 import sys
 import unittest
 
+from infinite_diff import FiniteDiff
 import numpy as np
 import xarray as xr
 
-from infinite_diff import FiniteDiff
+from . import TestCase
 
 
-class FiniteDiffTestCase(unittest.TestCase):
+class FiniteDiffTestCase(TestCase):
     def setUp(self):
         self.array_len = 10
         self.dim = 'testdim'
