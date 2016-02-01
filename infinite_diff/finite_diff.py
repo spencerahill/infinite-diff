@@ -154,7 +154,7 @@ class FiniteDiff(object):
         ).isel(**{dim: slice(-1, None, -1)})
 
     @classmethod
-    def cen_diff_deriv(cls, arr, dim, coord=None, order=2,
+    def cen_diff_deriv(cls, arr, dim, coord=None, spacing=1, order=2,
                        do_edges_one_sided=False):
         """
         Centered differencing approximation of 1st derivative.
@@ -173,18 +173,24 @@ class FiniteDiff(object):
             If `False`, the outputted array has a length in the computed axis
             reduced by `order`.
         """
-        if order != 2:
-            raise NotImplementedError("Centered differencing of df/dx only "
-                                      "supported for 2nd order currently")
-        if coord is None:
-            arr_coord = arr[dim]
-        else:
-            arr_coord = coord
-        numer = cls.cen_diff(arr, dim, spacing=1,
-                             do_edges_one_sided=do_edges_one_sided)
-        denom = cls.cen_diff(arr_coord, dim, spacing=1,
-                             do_edges_one_sided=do_edges_one_sided)
-        return numer / denom
+        arr_coord = cls.arr_coord(arr, dim, coord=coord)
+        if order == 2:
+            numer = cls.cen_diff(arr, dim, spacing=spacing,
+                                 do_edges_one_sided=do_edges_one_sided)
+            denom = cls.cen_diff(arr_coord, dim, spacing=spacing,
+                                 do_edges_one_sided=do_edges_one_sided)
+            return numer / denom
+        elif order == 4:
+            # Formula is (4/3)*cen_diff(spacing=1) - (1/3)*cen_diff(spacing=2)
+            return (1./3.) * (4*cls.cen_diff_deriv(
+                arr, dim, spacing=spacing, order=2,
+                do_edges_one_sided=do_edges_one_sided
+            ) - cls.cen_diff_deriv(
+                arr, dim, spacing=2*spacing, order=2,
+                do_edges_one_sided=do_edges_one_sided
+            ))
+        raise NotImplementedError("Centered differencing only "
+                                  "supported for 2nd and 4th order.")
 
     @classmethod
     def upwind_advec(cls, arr, flow, dim, coord=None, order=1,
