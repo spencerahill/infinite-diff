@@ -34,6 +34,7 @@ class FwdDiffTestCase(FiniteDiffTestCase):
     def setUp(self):
         super(FwdDiffTestCase, self).setUp()
         self.method = FiniteDiff.fwd_diff
+        self.is_bwd = False
 
 
 class TestFwdDiff(FwdDiffTestCase):
@@ -67,14 +68,20 @@ class TestFwdDiff(FwdDiffTestCase):
             ans = self.method(self.arange, self.dim, spacing=n+1)
             np.testing.assert_array_equal(ans, (n+1)*self.ones_trunc[n+1])
 
-if __name__ == '__main__':
-    sys.exit(unittest.main())
+    def test_output_coords(self):
+        for n in range(self._array_len - 1):
+            trunc = slice(n+1, None) if self.is_bwd else slice(0, -(n+1))
+            np.testing.assert_array_equal(
+                self.random[self.dim].isel(**{self.dim: trunc}),
+                self.method(self.random, self.dim, spacing=n+1)[self.dim]
+            )
 
 
 class TestBwdDiff(TestFwdDiff):
     def setUp(self):
         super(TestBwdDiff, self).setUp()
         self.method = FiniteDiff.bwd_diff
+        self.is_bwd = True
 
 
 class CenDiffTestCase(FiniteDiffTestCase):
@@ -150,6 +157,10 @@ class TestUpwindAdvec(UpwindAdvecTestCase):
     #                                   self.wraparounds):
     #         np.testing.assert_array_equal(
     #             flow * FiniteDiff.bwd_diff_deriv(
+
+
+if __name__ == '__main__':
+    sys.exit(unittest.main())
 
 
 # TODO: non-constant slope for fwd/bwd
