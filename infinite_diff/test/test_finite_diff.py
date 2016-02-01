@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 """Tests"""
+import itertools
 import sys
 import unittest
 
@@ -22,6 +23,8 @@ class FiniteDiffTestCase(unittest.TestCase):
         self.arange = xr.DataArray(np.arange(self._array_len), dims=[self.dim])
         self.arange_trunc = [self.arange.isel(**{self.dim: slice(n, None)})
                              for n in range(self._array_len)]
+        self.random = xr.DataArray(np.random.random((self._array_len)),
+                                   dims=[self.dim])
 
     def tearDown(self):
         pass
@@ -116,6 +119,38 @@ class TestBwdDiffDeriv(TestFwdDiffDeriv):
     def setUp(self):
         super(TestBwdDiffDeriv, self).setUp()
         self.method = FiniteDiff.bwd_diff_deriv
+
+
+class UpwindAdvecTestCase(FiniteDiffTestCase):
+    def setUp(self):
+        super(UpwindAdvecTestCase, self).setUp()
+        self.method = FiniteDiff.upwind_advec
+
+
+class TestUpwindAdvec(UpwindAdvecTestCase):
+    def setUp(self):
+        super(TestUpwindAdvec, self).setUp()
+        self.arrs = [self.arange, self.ones, self.zeros, self.random]
+        self.dims = [self.dim]
+        self.flows = [self.zeros]
+        self.coords = [None]
+        self.orders = [1]
+        self.wraparounds = [False, True]
+
+    def test_zero_flow(self):
+        for args in itertools.product(self.arrs, [self.zeros], self.dims,
+                                      self.coords, self.orders,
+                                      self.wraparounds):
+            self.assertTrue(not np.any(self.method(*args)))
+
+    # def test_unidirectional_flow(self):
+    #     flow = self.random
+    #     for args in itertools.product(self.arrs, [flow], self.dims,
+    #                                   self.coords, self.orders,
+    #                                   self.wraparounds):
+    #         np.testing.assert_array_equal(
+    #             flow * FiniteDiff.bwd_diff_deriv(
+
 
 # TODO: non-constant slope for fwd/bwd
 # TODO: tests of getting proper coord values for fwd/bwd
