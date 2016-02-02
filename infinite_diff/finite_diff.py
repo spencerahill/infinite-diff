@@ -219,10 +219,10 @@ class FiniteDiff(object):
     @staticmethod
     def upwind_advec_flow(flow):
         """Create negative- and positive-only arrays for upwind advection."""
-        flow_pos = flow.copy()
-        flow_pos.values[flow.values < 0] = 0.
         flow_neg = flow.copy()
         flow_neg.values[flow.values >= 0] = 0.
+        flow_pos = flow.copy()
+        flow_pos.values[flow.values < 0] = 0.
         return flow_neg, flow_pos
 
     @classmethod
@@ -238,13 +238,16 @@ class FiniteDiff(object):
                                  order=order, fill_edge=fill_edge)
         bwd = cls.bwd_diff_deriv(arr, dim, coord=coord, spacing=spacing,
                                  order=order, fill_edge=fill_edge)
+        # Forward diff on left edge; backward diff on right edge.
+        edge_right = {dim: -1}
+        edge_left = {dim: 0}
+        fwd[edge_right] = bwd[edge_right]
+        bwd[edge_left] = fwd[edge_left]
+        # In interior, forward diff for negative flow, backward for positive.
         flow_neg, flow_pos = cls.upwind_advec_flow(flow)
-        interior = flow_pos*bwd + flow_neg*fwd
+        advec = flow_pos*bwd + flow_neg*fwd
+        # Truncate to interior edges of filled edges not desired.
         if not fill_edge:
-            return interior
-        # Edges can't do upwind.
-        slice_left = {dim: slice(0, order)}
-        slice_right = {dim: slice(-order, None)}
-        left_edge = flow.isel(**slice_left) * fwd.isel(**slice_left)
-        right_edge = flow.isel(**slice_right) * bwd.isel(**slice_right)
-        return xr.concat([left_edge, interior, right_edge], dim=dim)
+            slice_middle = {dim: slice(order, -order)}
+            advec = advec.isel(**slice_middle)
+        return advec
