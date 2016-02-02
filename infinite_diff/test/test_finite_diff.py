@@ -122,9 +122,17 @@ class FwdDiffDerivTestCase(FiniteDiffTestCase):
     def setUp(self):
         super(FwdDiffDerivTestCase, self).setUp()
         self.method = FiniteDiff.fwd_diff_deriv
+        self.is_bwd = False
 
 
 class TestFwdDiffDeriv(FwdDiffDerivTestCase):
+    def test_order1_spacing1_no_fill(self):
+        label = 'upper' if self.is_bwd else 'lower'
+        desired = (self.random.diff(self.dim, label=label) /
+                   self.random[self.dim].diff(self.dim, label=label))
+        actual = self.method(self.random, self.dim)
+        assert desired.identical(actual)
+
     def test_constant_slope(self, order=1):
         for n, arange in enumerate(self.arange_trunc[:-1]):
             # Array len gets progressively smaller.
@@ -165,6 +173,7 @@ class TestBwdDiffDeriv(TestFwdDiffDeriv):
     def setUp(self):
         super(TestBwdDiffDeriv, self).setUp()
         self.method = FiniteDiff.bwd_diff_deriv
+        self.is_bwd = True
 
     @unittest.skip("Needs to be implemented")
     def test_reverse_dim(self):
@@ -192,6 +201,21 @@ class TestUpwindAdvec(UpwindAdvecTestCase):
         self.orders = [1, 2]
         self.fill_edges = [False, True]
 
+    def test_upwind_advec_flow(self):
+        flow = np.abs(self.random)
+        _, flow_pos = FiniteDiff.upwind_advec_flow(flow)
+        assert flow.identical(flow_pos)
+
+        flow *= -1
+        flow_neg, _ = FiniteDiff.upwind_advec_flow(flow)
+        assert flow.identical(flow_neg)
+
+        flow = xr.DataArray(np.random.uniform(low=-5, high=5,
+                                              size=self.random.shape),
+                            dims=self.random.dims, coords=self.random.coords)
+        flow_neg, flow_pos = FiniteDiff.upwind_advec_flow(flow)
+        assert flow.identical(flow_neg + flow_pos)
+
     def test_output_coords(self):
         desired = self.arange.coords.to_dataset()
         for args in itertools.product(self.arrs, [self.zeros], self.dims,
@@ -208,17 +232,17 @@ class TestUpwindAdvec(UpwindAdvecTestCase):
 
     def test_unidirectional_flow(self):
         flow = np.abs(self.random)
-        # np.testing.assert_array_equal(
-        #     flow * FiniteDiff.bwd_diff_deriv(
-        #         self.arange, self.dim, coord=None, spacing=1,
-        #         order=1, fill_edge=False
-        #     ).isel(**{self.dim: slice(1, None)}),
-        #     self.method(self.arange, flow, self.dim, coord=None,
-        #                 spacing=1, order=1, fill_edge=False)
-        # )
+        np.testing.assert_array_equal(
+            flow * FiniteDiff.bwd_diff_deriv(
+                self.arange, self.dim, coord=None, spacing=1,
+                order=1, fill_edge=False
+            ).isel(**{self.dim: slice(1, None)}),
+            self.method(self.arange, flow, self.dim, coord=None,
+                        spacing=1, order=1, fill_edge=False)
+        )
         flow *= -1
         for order in (1, 2):
-            for fill_edge in (True, False):
+            for fill_edge in [True, False]:
                 np.testing.assert_array_equal(
                     flow * FiniteDiff.fwd_diff_deriv(
                         self.arange, self.dim, coord=None, spacing=1,
