@@ -78,6 +78,16 @@ class TestFwdDiff(FwdDiffTestCase):
             ans = self.method(self.arange, self.dim, spacing=n+1)
             np.testing.assert_array_equal(ans, (n+1)*self.ones_trunc[n+1])
 
+    def compar_to_diff(self, arr):
+        label = 'upper' if self.is_bwd else 'lower'
+        desired = arr.diff(self.dim, n=1, label=label)
+        actual = self.method(arr, self.dim, spacing=1)
+        assert desired.identical(actual)
+
+    def test_various_slopes(self):
+        for arr in [self.ones, self.zeros, self.arange, self.random]:
+            self.compar_to_diff(arr)
+
     def test_output_coords(self):
         for n in range(self.array_len - 1):
             trunc = slice(n+1, None) if self.is_bwd else slice(0, -(n+1))
@@ -85,12 +95,6 @@ class TestFwdDiff(FwdDiffTestCase):
                 self.random[self.dim].isel(**{self.dim: trunc}),
                 self.method(self.random, self.dim, spacing=n+1)[self.dim]
             )
-
-    def test_varying_slope(self):
-        label = 'upper' if self.is_bwd else 'lower'
-        desired = self.random.diff(self.dim, n=1, label=label)
-        actual = self.method(self.random, self.dim, spacing=1)
-        np.testing.assert_array_equal(desired, actual)
 
 
 class TestBwdDiff(TestFwdDiff):
@@ -147,6 +151,15 @@ class TestFwdDiffDeriv(FwdDiffDerivTestCase):
                               fill_edge=True)
             np.testing.assert_array_equal(ans, self.ones_trunc[n+1])
 
+    def test_output_coords(self):
+        desired = self.random.coords.to_dataset()
+        ans = self.method(self.random, self.dim, coord=None, spacing=1,
+                          order=1, fill_edge=True).coords.to_dataset()
+        assert ans.identical(desired)
+        # ans = self.method(self.random, self.dim, coord=None, spacing=1,
+        #                   order=1, fill_edge=False).coords.to_dataset()
+        # assert ans.identical(desired.isel(
+
 
 class TestBwdDiffDeriv(TestFwdDiffDeriv):
     def setUp(self):
@@ -176,8 +189,16 @@ class TestUpwindAdvec(UpwindAdvecTestCase):
         self.flows = [self.zeros]
         self.coords = [None]
         self.spacings = [1]
-        self.orders = [1]
+        self.orders = [1, 2]
         self.fill_edges = [False, True]
+
+    def test_output_coords(self):
+        desired = self.arange.coords.to_dataset()
+        for args in itertools.product(self.arrs, [self.zeros], self.dims,
+                                      self.coords, self.spacings, self.orders,
+                                      [True]):
+            ans = self.method(*args).coords.to_dataset()
+            assert desired.identical(ans)
 
     def test_zero_flow(self):
         for args in itertools.product(self.arrs, [self.zeros], self.dims,
@@ -187,23 +208,25 @@ class TestUpwindAdvec(UpwindAdvecTestCase):
 
     def test_unidirectional_flow(self):
         flow = np.abs(self.random)
-        np.testing.assert_array_equal(
-            flow * FiniteDiff.bwd_diff_deriv(
-                self.arange, self.dim, coord=None, spacing=1,
-                order=1, fill_edge=False
-            ).isel(**{self.dim: slice(1, None)}),
-            self.method(self.arange, flow, self.dim, coord=None,
-                        spacing=1, order=1, fill_edge=False)
-        )
+        # np.testing.assert_array_equal(
+        #     flow * FiniteDiff.bwd_diff_deriv(
+        #         self.arange, self.dim, coord=None, spacing=1,
+        #         order=1, fill_edge=False
+        #     ).isel(**{self.dim: slice(1, None)}),
+        #     self.method(self.arange, flow, self.dim, coord=None,
+        #                 spacing=1, order=1, fill_edge=False)
+        # )
         flow *= -1
-        np.testing.assert_array_equal(
-            flow * FiniteDiff.fwd_diff_deriv(
-                self.arange, self.dim, coord=None, spacing=1,
-                order=1, fill_edge=False
-            ).isel(**{self.dim: slice(1, None)}),
-            self.method(self.arange, flow, self.dim, coord=None,
-                        spacing=1, order=1, fill_edge=False)
-        )
+        for order in (1, 2):
+            for fill_edge in (True, False):
+                np.testing.assert_array_equal(
+                    flow * FiniteDiff.fwd_diff_deriv(
+                        self.arange, self.dim, coord=None, spacing=1,
+                        order=order, fill_edge=fill_edge
+                    ).isel(**{self.dim: slice(1, None)}),
+                    self.method(self.arange, flow, self.dim, coord=None,
+                                spacing=1, order=order, fill_edge=fill_edge)
+                )
 
 
 if __name__ == '__main__':
