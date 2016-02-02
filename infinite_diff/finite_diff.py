@@ -240,29 +240,11 @@ class FiniteDiff(object):
                                  order=order, fill_edge=fill_edge)
         flow_neg, flow_pos = cls.upwind_advec_flow(flow)
         interior = flow_pos*bwd + flow_neg*fwd
-        # If array has wraparound values, no special edge handling needed.
         if not fill_edge:
             return interior
         # Edges can't do upwind.
-        # slice_left = {dim: slice(0, order+1)}
-        # slice_right = {dim: slice(-(order+1), None)}
-        slice_left_flow = {dim: slice(0, order)}
-        slice_right_flow = {dim: slice(-order, None)}
-        # if coord is None:
-            # coord_left = None
-            # coord_right = None
-        # else:
-            # pass
-            # coord_left = coord.isel(**slice_left)
-            # coord_right = coord.isel(**slice_right)
-        left_edge = flow.isel(**slice_left_flow) * fwd.isel(**slice_left_flow)
-        # cls.fwd_diff_deriv(
-            # arr.isel(**slice_left), dim, coord=coord_left, spacing=spacing,
-            # order=order, fill_edge=False
-        # )
-        right_edge = flow.isel(**slice_right_flow) * bwd.isel(**slice_right_flow)
-        # cls.bwd_diff_deriv(
-            # arr.isel(**slice_right), dim, coord=coord_right, spacing=spacing,
-            # order=order, fill_edge=False
-        # )
+        slice_left = {dim: slice(0, order)}
+        slice_right = {dim: slice(-order, None)}
+        left_edge = flow.isel(**slice_left) * fwd.isel(**slice_left)
+        right_edge = flow.isel(**slice_right) * bwd.isel(**slice_right)
         return xr.concat([left_edge, interior, right_edge], dim=dim)
