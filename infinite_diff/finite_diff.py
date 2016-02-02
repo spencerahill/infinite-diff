@@ -148,10 +148,12 @@ class FiniteDiff(object):
         :out: Array containing the df/dx approximation, with length in the 0th
               axis one less than that of the input array.
         """
+        reverse_slice = {dim: slice(-1, None, -1)}
+        arr_coord = cls.arr_coord(arr, dim, coord=coord).isel(**reverse_slice)
         return cls.fwd_diff_deriv(
-            arr.isel(**{dim: slice(-1, None, -1)}), dim, coord=coord,
+            arr.isel(**reverse_slice), dim, coord=arr_coord,
             spacing=spacing, order=order
-        ).isel(**{dim: slice(-1, None, -1)})
+        ).isel(**reverse_slice)
 
     @classmethod
     def cen_diff_deriv(cls, arr, dim, coord=None, spacing=1, order=2,
@@ -195,6 +197,15 @@ class FiniteDiff(object):
         raise NotImplementedError("Centered differencing only "
                                   "supported for 2nd and 4th order.")
 
+    @staticmethod
+    def upwind_advec_flow(flow):
+        """Create negative- and positive-only arrays for upwind advection."""
+        flow_pos = flow.copy()
+        flow_pos.values[flow.values < 0] = 0.
+        flow_neg = flow.copy()
+        flow_neg.values[flow.values >= 0] = 0.
+        return flow_neg, flow_pos
+
     @classmethod
     def upwind_advec(cls, arr, flow, dim, coord=None, order=1,
                      wraparound=False):
@@ -207,12 +218,9 @@ class FiniteDiff(object):
         if order == 2:
             return cls.upwind_advec2(arr, flow, dim, coord=coord,
                                      wraparound=wraparound)
-        flow_pos = flow.copy()
-        flow_pos.values[flow.values < 0] = 0.
-        flow_neg = flow.copy()
-        flow_neg.values[flow.values >= 0] = 0.
         fwd = cls.bwd_diff_deriv(arr, dim, coord=coord, order=order)
         bwd = cls.fwd_diff_deriv(arr, dim, coord=coord, order=order)
+        flow_neg, flow_pos = cls.upwind_advec_flow(flow)
         interior = flow_pos*bwd + flow_neg*fwd
         # If array has wraparound values, no special edge handling needed.
         if wraparound:
