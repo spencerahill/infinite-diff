@@ -217,17 +217,33 @@ class FiniteDiff(object):
                                   "supported for 2nd and 4th order.")
 
     @staticmethod
-    def upwind_advec_flow(flow):
-        """Create negative- and positive-only arrays for upwind advection."""
+    def upwind_advec_flow(flow, reverse_dim=False):
+        """Create negative- and positive-only arrays for upwind advection.
+
+        :param flow: Flow that is advecting some field.
+        :type flow: xarray.DataArray
+        :param reverse_dim: `True` signifies that the dimension in question has
+            a physical orientation opposite to its orientation within the
+            DataArray.  E.g. if the flow is the pressure velocity, omega, and
+            the pressure coordinate goes from large to small pressure values,
+            then this flag shold be set to `True`.  Default is `False`.
+        :type reverse_dim: bool
+        :out: flow_neg, flow_pos xarray.DataArrays with shape and coords
+            identical to `flow1, but with, respectively, all positive and
+            negative values set to 0 (or the reverse if `reverse_dim` is
+            `True`).
+        """
         flow_neg = flow.copy()
         flow_neg.values[flow.values >= 0] = 0.
         flow_pos = flow.copy()
         flow_pos.values[flow.values < 0] = 0.
-        return flow_neg, flow_pos
+        if not reverse_dim:
+            return flow_neg, flow_pos
+        return flow_pos, flow_neg
 
     @classmethod
     def upwind_advec(cls, arr, flow, dim, coord=None, spacing=1, order=1,
-                     fill_edge=False):
+                     fill_edge=False, reverse_dim=False):
         """
         Upwind differencing scheme for advection.
 
@@ -244,8 +260,8 @@ class FiniteDiff(object):
         fwd[edge_right] = bwd[edge_right]
         bwd[edge_left] = fwd[edge_left]
         # In interior, forward diff for negative flow, backward for positive.
-        flow_neg, flow_pos = cls.upwind_advec_flow(flow)
-        advec = flow_pos*bwd + flow_neg*fwd
+        neg, pos = cls.upwind_advec_flow(flow, reverse_dim=reverse_dim)
+        advec = pos*bwd + neg*fwd
         # Truncate to interior edges of filled edges not desired.
         if not fill_edge:
             slice_middle = {dim: slice(order, -order)}

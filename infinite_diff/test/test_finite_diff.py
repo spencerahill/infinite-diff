@@ -203,18 +203,33 @@ class TestUpwindAdvec(UpwindAdvecTestCase):
 
     def test_upwind_advec_flow(self):
         flow = np.abs(self.random)
-        _, flow_pos = FiniteDiff.upwind_advec_flow(flow)
-        assert flow.identical(flow_pos)
+        _, pos = FiniteDiff.upwind_advec_flow(flow)
+        assert flow.identical(pos)
 
         flow *= -1
-        flow_neg, _ = FiniteDiff.upwind_advec_flow(flow)
-        assert flow.identical(flow_neg)
+        neg, _ = FiniteDiff.upwind_advec_flow(flow)
+        assert flow.identical(neg)
 
         flow = xr.DataArray(np.random.uniform(low=-5, high=5,
                                               size=self.random.shape),
                             dims=self.random.dims, coords=self.random.coords)
-        flow_neg, flow_pos = FiniteDiff.upwind_advec_flow(flow)
-        assert flow.identical(flow_neg + flow_pos)
+        neg, pos = FiniteDiff.upwind_advec_flow(flow)
+        assert flow.identical(neg + pos)
+
+    def test_reverse_dim(self):
+        flow = np.abs(self.random)
+        neg, _ = FiniteDiff.upwind_advec_flow(flow, reverse_dim=True)
+        assert flow.identical(neg)
+
+        flow *= -1
+        _, pos = FiniteDiff.upwind_advec_flow(flow, reverse_dim=True)
+        assert flow.identical(pos)
+
+        flow = xr.DataArray(np.random.uniform(low=-5, high=5,
+                                              size=self.random.shape),
+                            dims=self.random.dims, coords=self.random.coords)
+        neg, pos = FiniteDiff.upwind_advec_flow(flow, reverse_dim=True)
+        assert flow.identical(neg + pos)
 
     def test_output_coords(self):
         desired = self.arange.coords.to_dataset()
