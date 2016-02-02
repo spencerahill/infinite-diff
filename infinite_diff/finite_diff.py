@@ -57,12 +57,17 @@ class FiniteDiff(object):
         return xr.DataArray(right.values, dims=right.dims,
                             coords=left.coords) - left
 
+    @staticmethod
+    def reverse_dim(arr, dim):
+        """Reverse the DataArray along the given dimension."""
+        return arr.isel(**{dim: slice(-1, None, -1)})
+
     @classmethod
     def bwd_diff(cls, arr, dim, spacing=1):
         """Backward differencing of the array."""
-        return -1*cls.fwd_diff(
-            arr.isel(**{dim: slice(-1, None, -1)}), dim, spacing=spacing
-        ).isel(**{dim: slice(-1, None, -1)})
+        return -1*cls.reverse_dim(
+            cls.fwd_diff(cls.reverse_dim(arr, dim), dim, spacing=spacing), dim
+        )
 
     @classmethod
     def edges_one_sided(cls, arr, dim, spacing_left=1, spacing_right=1):
@@ -148,11 +153,6 @@ class FiniteDiff(object):
                              dim=dim)
         raise NotImplementedError("Forward differencing derivative only "
                                   "supported for 1st and 2nd order currently")
-
-    @staticmethod
-    def reverse_dim(arr, dim):
-        """Reverse the xarray.DataArray along the given dimension."""
-        return arr.isel(**{dim: slice(-1, None, -1)})
 
     @classmethod
     def bwd_diff_deriv(cls, arr, dim, coord=None, spacing=1, order=1,
