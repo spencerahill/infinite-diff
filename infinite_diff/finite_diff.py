@@ -137,6 +137,11 @@ class FiniteDiff(object):
         raise NotImplementedError("Forward differencing derivative only "
                                   "supported for 1st and 2nd order currently")
 
+    @staticmethod
+    def reverse_dim(arr, dim):
+        """Reverse the xarray.DataArray along the given dimension."""
+        return arr.isel(**{dim: slice(-1, None, -1)})
+
     @classmethod
     def bwd_diff_deriv(cls, arr, dim, coord=None, spacing=1, order=1):
         """1st order accurate backward differencing approx of derivative.
@@ -148,12 +153,12 @@ class FiniteDiff(object):
         :out: Array containing the df/dx approximation, with length in the 0th
               axis one less than that of the input array.
         """
-        reverse_slice = {dim: slice(-1, None, -1)}
-        arr_coord = cls.arr_coord(arr, dim, coord=coord).isel(**reverse_slice)
-        return cls.fwd_diff_deriv(
-            arr.isel(**reverse_slice), dim, coord=arr_coord,
-            spacing=spacing, order=order
-        ).isel(**reverse_slice)
+        arr_coord = cls.arr_coord(arr, dim, coord=coord)
+        return cls.reverse_dim(
+            cls.fwd_diff_deriv(cls.reverse_dim(arr, dim), dim,
+                               coord=cls.reverse_dim(arr_coord, dim),
+                               spacing=spacing, order=order), dim
+        )
 
     @classmethod
     def cen_diff_deriv(cls, arr, dim, coord=None, spacing=1, order=2,
@@ -228,16 +233,18 @@ class FiniteDiff(object):
         # Edge cases can't do upwind.
         slice_left = {dim: slice(0, order+1)}
         slice_right = {dim: slice(-(order+1), None)}
+        slice_left_flow = {dim: slice(0, order)}
+        slice_right_flow = {dim: slice(-order, None)}
         if coord is None:
             coord_left = None
             coord_right = None
         else:
             coord_left = coord.isel(**slice_left)
             coord_right = coord.isel(**slice_right)
-        left_edge = flow.isel(**{dim: 0}) * cls.fwd_diff_deriv(
+        left_edge = flow.isel(**slice_left_flow) * cls.fwd_diff_deriv(
             arr.isel(**slice_left), dim, coord=coord_left, order=order
         )
-        right_edge = flow.isel(**{dim: -1}) * cls.bwd_diff_deriv(
+        right_edge = flow.isel(**slice_right_flow) * cls.bwd_diff_deriv(
             arr.isel(**slice_right), dim, coord=coord_right, order=order
         )
         return xr.concat([left_edge, interior, right_edge], dim=dim)

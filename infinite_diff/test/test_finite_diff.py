@@ -138,6 +138,10 @@ class TestBwdDiffDeriv(TestFwdDiffDeriv):
         self.method = FiniteDiff.bwd_diff_deriv
 
     @unittest.skip("Needs to be implemented")
+    def test_reverse_dim(self):
+        pass
+
+    @unittest.skip("Needs to be implemented")
     def test_coord_reverse(self):
         pass
 
