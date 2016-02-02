@@ -110,7 +110,8 @@ class FiniteDiff(object):
         return coord
 
     @classmethod
-    def fwd_diff_deriv(cls, arr, dim, coord=None, spacing=1, order=1):
+    def fwd_diff_deriv(cls, arr, dim, coord=None, spacing=1, order=1,
+                       fill_edge=False):
         """1st order accurate forward differencing approximation of derivative.
 
         :param arr: Field to take derivative of.
@@ -128,12 +129,19 @@ class FiniteDiff(object):
             # Formula is 2*fwd_diff(spacing=1) - fwd_diff(spacing=2)
             # But have to truncate fwd_diff(spacing=1) to be on same grid as
             # fwd_diff(spacing=2)
+            single_space = cls.fwd_diff_deriv(arr, dim, coord=arr_coord,
+                                              spacing=spacing, order=1,
+                                              fill_edge=False)
+            double_space = cls.fwd_diff_deriv(arr, dim, coord=arr_coord,
+                                              spacing=2*spacing, order=1,
+                                              fill_edge=False)
             trunc = {dim: slice(0, -spacing)}
-            return (2*cls.fwd_diff_deriv(arr.isel(**trunc), dim,
-                                         coord=arr_coord.isel(**trunc),
-                                         spacing=spacing, order=1) -
-                    cls.fwd_diff_deriv(arr, dim, coord=arr_coord,
-                                       spacing=2*spacing, order=1))
+            interior = 2*single_space.isel(**trunc) - double_space
+            if not fill_edge:
+                return interior
+            right_edge = {dim: slice(-spacing, None)}
+            return xr.concat([interior, single_space.isel(**right_edge)],
+                             dim=dim)
         raise NotImplementedError("Forward differencing derivative only "
                                   "supported for 1st and 2nd order currently")
 
@@ -143,7 +151,8 @@ class FiniteDiff(object):
         return arr.isel(**{dim: slice(-1, None, -1)})
 
     @classmethod
-    def bwd_diff_deriv(cls, arr, dim, coord=None, spacing=1, order=1):
+    def bwd_diff_deriv(cls, arr, dim, coord=None, spacing=1, order=1,
+                       fill_edge=False):
         """1st order accurate backward differencing approx of derivative.
 
         :param arr: Field to take derivative of.
@@ -157,7 +166,8 @@ class FiniteDiff(object):
         return cls.reverse_dim(
             cls.fwd_diff_deriv(cls.reverse_dim(arr, dim), dim,
                                coord=cls.reverse_dim(arr_coord, dim),
-                               spacing=spacing, order=order), dim
+                               spacing=spacing, order=order,
+                               fill_edge=fill_edge), dim
         )
 
     @classmethod
@@ -223,8 +233,10 @@ class FiniteDiff(object):
         if order == 2:
             return cls.upwind_advec2(arr, flow, dim, coord=coord,
                                      wraparound=wraparound)
-        fwd = cls.bwd_diff_deriv(arr, dim, coord=coord, order=order)
-        bwd = cls.fwd_diff_deriv(arr, dim, coord=coord, order=order)
+        fwd = cls.bwd_diff_deriv(arr, dim, coord=coord, order=order,
+                                 fill_edge=(not wraparound))
+        bwd = cls.fwd_diff_deriv(arr, dim, coord=coord, order=order,
+                                 fill_edge=(not wraparound))
         flow_neg, flow_pos = cls.upwind_advec_flow(flow)
         interior = flow_pos*bwd + flow_neg*fwd
         # If array has wraparound values, no special edge handling needed.
