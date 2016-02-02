@@ -31,7 +31,8 @@ class FiniteDiffTestCase(TestCase):
         )
         self.arange_trunc = [self.arange.isel(**{self.dim: slice(n, None)})
                              for n in range(self.array_len)]
-        self.random = xr.DataArray(np.random.random(self.ones.shape,),
+        randstate = np.random.RandomState(12345)
+        self.random = xr.DataArray(randstate.rand(*self.ones.shape),
                                    dims=self.ones.dims)
 
     def tearDown(self):
@@ -85,6 +86,12 @@ class TestFwdDiff(FwdDiffTestCase):
                 self.method(self.random, self.dim, spacing=n+1)[self.dim]
             )
 
+    def test_varying_slope(self):
+        label = 'upper' if self.is_bwd else 'lower'
+        desired = self.random.diff(self.dim, n=1, label=label)
+        actual = self.method(self.random, self.dim, spacing=1)
+        np.testing.assert_array_equal(desired, actual)
+
 
 class TestBwdDiff(TestFwdDiff):
     def setUp(self):
@@ -120,6 +127,10 @@ class TestFwdDiffDeriv(FwdDiffDerivTestCase):
             ans = self.method(arange, self.dim, coord=None, spacing=1,
                               order=order, fill_edge=False)
             np.testing.assert_array_equal(ans, self.ones_trunc[n+order])
+            # Same, with fill_edge=True.
+            ans = self.method(arange, self.dim, coord=None, spacing=1,
+                              order=order, fill_edge=True)
+            np.testing.assert_array_equal(ans, self.ones_trunc[n])
             # Spacing of differencing gets progressively larger.
             ans = self.method(self.arange, self.dim, coord=None, spacing=n+1,
                               order=order, fill_edge=False)
@@ -131,6 +142,7 @@ class TestFwdDiffDeriv(FwdDiffDerivTestCase):
             ans = self.method(arange, self.dim, coord=None, spacing=1, order=2,
                               fill_edge=False)
             np.testing.assert_array_equal(ans, self.ones_trunc[n+2])
+            # Same, with fill_edge=True.
             ans = self.method(arange, self.dim, coord=None, spacing=1, order=2,
                               fill_edge=True)
             np.testing.assert_array_equal(ans, self.ones_trunc[n+1])
@@ -163,22 +175,35 @@ class TestUpwindAdvec(UpwindAdvecTestCase):
         self.dims = [self.dim]
         self.flows = [self.zeros]
         self.coords = [None]
+        self.spacings = [1]
         self.orders = [1]
-        self.wraparounds = [False, True]
+        self.fill_edges = [False, True]
 
     def test_zero_flow(self):
         for args in itertools.product(self.arrs, [self.zeros], self.dims,
-                                      self.coords, self.orders,
-                                      self.wraparounds):
+                                      self.coords, self.spacings, self.orders,
+                                      self.fill_edges):
             self.assertTrue(not np.any(self.method(*args)))
 
-    # def test_unidirectional_flow(self):
-    #     flow = self.random
-    #     for args in itertools.product(self.arrs, [flow], self.dims,
-    #                                   self.coords, self.orders,
-    #                                   self.wraparounds):
-    #         np.testing.assert_array_equal(
-    #             flow * FiniteDiff.bwd_diff_deriv(
+    def test_unidirectional_flow(self):
+        flow = np.abs(self.random)
+        np.testing.assert_array_equal(
+            flow * FiniteDiff.bwd_diff_deriv(
+                self.arange, self.dim, coord=None, spacing=1,
+                order=1, fill_edge=False
+            ).isel(**{self.dim: slice(1, None)}),
+            self.method(self.arange, flow, self.dim, coord=None,
+                        spacing=1, order=1, fill_edge=False)
+        )
+        flow *= -1
+        np.testing.assert_array_equal(
+            flow * FiniteDiff.fwd_diff_deriv(
+                self.arange, self.dim, coord=None, spacing=1,
+                order=1, fill_edge=False
+            ).isel(**{self.dim: slice(1, None)}),
+            self.method(self.arange, flow, self.dim, coord=None,
+                        spacing=1, order=1, fill_edge=False)
+        )
 
 
 if __name__ == '__main__':

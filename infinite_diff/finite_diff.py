@@ -123,20 +123,24 @@ class FiniteDiff(object):
         """
         arr_coord = cls.arr_coord(arr, dim, coord=coord)
         if order == 1:
-            return (cls.fwd_diff(arr, dim, spacing=spacing) /
-                    cls.fwd_diff(arr_coord, dim, spacing=spacing))
+            interior = (cls.fwd_diff(arr, dim, spacing=spacing) /
+                        cls.fwd_diff(arr_coord, dim, spacing=spacing))
+            if not fill_edge:
+                return interior
+            right_slice = {dim: slice(-(spacing+1), None)}
+            right_edge = (cls.bwd_diff(arr.isel(**right_slice), dim,
+                                       spacing=spacing) /
+                          cls.bwd_diff(arr_coord.isel(**right_slice), dim,
+                                       spacing=spacing))
+            return xr.concat([interior, right_edge], dim=dim)
         elif order == 2:
-            # Formula is 2*fwd_diff(spacing=1) - fwd_diff(spacing=2)
-            # But have to truncate fwd_diff(spacing=1) to be on same grid as
-            # fwd_diff(spacing=2)
             single_space = cls.fwd_diff_deriv(arr, dim, coord=arr_coord,
                                               spacing=spacing, order=1,
-                                              fill_edge=False)
+                                              fill_edge=fill_edge)
             double_space = cls.fwd_diff_deriv(arr, dim, coord=arr_coord,
                                               spacing=2*spacing, order=1,
                                               fill_edge=False)
-            trunc = {dim: slice(0, -spacing)}
-            interior = 2*single_space.isel(**trunc) - double_space
+            interior = 2*single_space - double_space
             if not fill_edge:
                 return interior
             right_edge = {dim: slice(-spacing, None)}
@@ -222,77 +226,43 @@ class FiniteDiff(object):
         return flow_neg, flow_pos
 
     @classmethod
-    def upwind_advec(cls, arr, flow, dim, coord=None, order=1,
-                     wraparound=False):
+    def upwind_advec(cls, arr, flow, dim, coord=None, spacing=1, order=1,
+                     fill_edge=False):
         """
         Upwind differencing scheme for advection.
 
         :param arr: Field being advected.
         :param flow: Flow that is advecting the field.
         """
-        if order == 2:
-            return cls.upwind_advec2(arr, flow, dim, coord=coord,
-                                     wraparound=wraparound)
-        fwd = cls.bwd_diff_deriv(arr, dim, coord=coord, order=order,
-                                 fill_edge=(not wraparound))
-        bwd = cls.fwd_diff_deriv(arr, dim, coord=coord, order=order,
-                                 fill_edge=(not wraparound))
+        fwd = cls.fwd_diff_deriv(arr, dim, coord=coord, spacing=spacing,
+                                 order=order, fill_edge=fill_edge)
+        bwd = cls.bwd_diff_deriv(arr, dim, coord=coord, spacing=spacing,
+                                 order=order, fill_edge=fill_edge)
         flow_neg, flow_pos = cls.upwind_advec_flow(flow)
         interior = flow_pos*bwd + flow_neg*fwd
         # If array has wraparound values, no special edge handling needed.
-        if wraparound:
+        if not fill_edge:
             return interior
-        # Edge cases can't do upwind.
-        slice_left = {dim: slice(0, order+1)}
-        slice_right = {dim: slice(-(order+1), None)}
+        # Edges can't do upwind.
+        # slice_left = {dim: slice(0, order+1)}
+        # slice_right = {dim: slice(-(order+1), None)}
         slice_left_flow = {dim: slice(0, order)}
         slice_right_flow = {dim: slice(-order, None)}
-        if coord is None:
-            coord_left = None
-            coord_right = None
-        else:
-            coord_left = coord.isel(**slice_left)
-            coord_right = coord.isel(**slice_right)
-        left_edge = flow.isel(**slice_left_flow) * cls.fwd_diff_deriv(
-            arr.isel(**slice_left), dim, coord=coord_left, order=order
-        )
-        right_edge = flow.isel(**slice_right_flow) * cls.bwd_diff_deriv(
-            arr.isel(**slice_right), dim, coord=coord_right, order=order
-        )
-        return xr.concat([left_edge, interior, right_edge], dim=dim)
-
-    @classmethod
-    def upwind_advec2(cls, arr, flow, dim, coord=None, wraparound=False):
-        """
-        Upwind differencing scheme for advection with 2nd order accuracy.
-
-        :param arr: Field being advected.
-        :param flow: Flow that is advecting the field.
-        """
-        flow_pos = flow.copy()
-        flow_pos.values[flow.values < 0] = 0.
-        flow_neg = flow.copy()
-        flow_neg.values[flow.values >= 0] = 0.
-        fwd = cls.bwd_diff2_deriv(arr, dim, coord=coord)
-        bwd = cls.fwd_diff2_deriv(arr, dim, coord=coord)
-        interior = flow_pos*bwd + flow_neg*fwd
-        # If array has wraparound values, no special edge handling needed.
-        if wraparound:
-            return interior
-        # Edge cases can't do upwind.
-        order = 2
-        slice_left = {dim: slice(0, order)}
-        slice_right = {dim: slice(-order, None)}
-        if coord is None:
-            coord_left = None
-            coord_right = None
-        else:
-            coord_left = coord.isel(**slice_left)
-            coord_right = coord.isel(**slice_right)
-        left_edge = flow.isel(**slice_left) * cls.fwd_diff_deriv(
-            arr.isel(**slice_left), dim, coord=coord_left
-        )
-        right_edge = flow.isel(**slice_right) * cls.bwd_diff_deriv(
-            arr.isel(**slice_right), dim, coord=coord_right
-        )
+        # if coord is None:
+            # coord_left = None
+            # coord_right = None
+        # else:
+            # pass
+            # coord_left = coord.isel(**slice_left)
+            # coord_right = coord.isel(**slice_right)
+        left_edge = flow.isel(**slice_left_flow) * fwd.isel(**slice_left_flow)
+        # cls.fwd_diff_deriv(
+            # arr.isel(**slice_left), dim, coord=coord_left, spacing=spacing,
+            # order=order, fill_edge=False
+        # )
+        right_edge = flow.isel(**slice_right_flow) * bwd.isel(**slice_right_flow)
+        # cls.bwd_diff_deriv(
+            # arr.isel(**slice_right), dim, coord=coord_right, spacing=spacing,
+            # order=order, fill_edge=False
+        # )
         return xr.concat([left_edge, interior, right_edge], dim=dim)
