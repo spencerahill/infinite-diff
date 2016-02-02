@@ -103,6 +103,14 @@ class TestBwdDiff(TestFwdDiff):
         self.method = FiniteDiff.bwd_diff
         self.is_bwd = True
 
+    def test_reverse_dim(self):
+        arr = xr.DataArray(np.arange(10), dims=[self.dim],
+                           coords={self.dim: np.arange(10)})
+        actual = FiniteDiff.reverse_dim(arr, self.dim)
+        desired = xr.DataArray(np.arange(10)[::-1], dims=[self.dim],
+                               coords={self.dim: np.arange(10)[::-1]})
+        assert desired.identical(actual)
+
 
 class CenDiffTestCase(FiniteDiffTestCase):
     def setUp(self):
@@ -131,6 +139,23 @@ class TestFwdDiffDeriv(FwdDiffDerivTestCase):
         desired = (self.random.diff(self.dim, label=label) /
                    self.random[self.dim].diff(self.dim, label=label))
         actual = self.method(self.random, self.dim)
+        assert desired.identical(actual)
+
+    def test_order1_spacing1_fill(self):
+        # Some parameters differ for fwd v. bwd diff.
+        label = 'upper' if self.is_bwd else 'lower'
+        edge_label = 'lower' if self.is_bwd else 'upper'
+        trunc = slice(0, 2) if self.is_bwd else slice(-2, None)
+        # concat_positions = [1, 0] if self.is_bwd else [0, 1]
+
+        interior = (self.random.diff(self.dim, label=label) /
+                    self.random[self.dim].diff(self.dim, label=label))
+        arr_edge = self.random.isel(**{self.dim: trunc})
+
+        edge = (arr_edge.diff(self.dim, label=edge_label) /
+                arr_edge[self.dim].diff(self.dim, label=edge_label))
+        desired = xr.concat([interior, edge], dim=self.dim)
+        actual = self.method(self.random, self.dim, fill_edge=True)
         assert desired.identical(actual)
 
     def test_constant_slope(self, order=1):
@@ -174,10 +199,6 @@ class TestBwdDiffDeriv(TestFwdDiffDeriv):
         super(TestBwdDiffDeriv, self).setUp()
         self.method = FiniteDiff.bwd_diff_deriv
         self.is_bwd = True
-
-    @unittest.skip("Needs to be implemented")
-    def test_reverse_dim(self):
-        pass
 
     @unittest.skip("Needs to be implemented")
     def test_coord_reverse(self):
@@ -233,11 +254,13 @@ class TestUpwindAdvec(UpwindAdvecTestCase):
 
     def test_output_coords(self):
         desired = self.arange.coords.to_dataset()
-        for args in itertools.product(self.arrs, [self.zeros], self.dims,
-                                      self.coords, self.spacings, self.orders,
-                                      [True]):
-            ans = self.method(*args).coords.to_dataset()
-            assert desired.identical(ans)
+        for arr, zeros, dim, coord, spacing, order, fill in \
+            itertools.product(self.arrs, [self.zeros], self.dims,
+                              self.coords, self.spacings, self.orders,
+                              [True]):
+            ans = self.method(arr, zeros, dim, coord=coord,
+                              spacing=spacing, order=order, fill_edge=fill)
+            assert desired.identical(ans.coords.to_dataset())
 
     def test_zero_flow(self):
         for args in itertools.product(self.arrs, [self.zeros], self.dims,
