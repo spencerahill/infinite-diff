@@ -60,6 +60,14 @@ class TestFwdDiff(FwdDiffTestCase):
             self.assertRaises(ValueError, self.method,
                               self.ones.isel(**{self.dim: 0}), self.dim)
 
+    def test_output_coords(self):
+        for n in range(self.array_len - 1):
+            trunc = slice(n+1, None) if self.is_bwd else slice(0, -(n+1))
+            np.testing.assert_array_equal(
+                self.random[self.dim].isel(**{self.dim: trunc}),
+                self.method(self.random, self.dim, spacing=n+1)[self.dim]
+            )
+
     def test_zero_slope(self):
         for n, zeros in enumerate(self.zeros_trunc[1:]):
             # Array len gets progressively smaller.
@@ -78,7 +86,7 @@ class TestFwdDiff(FwdDiffTestCase):
             ans = self.method(self.arange, self.dim, spacing=n+1)
             np.testing.assert_array_equal(ans, (n+1)*self.ones_trunc[n+1])
 
-    def compar_to_diff(self, arr):
+    def _compar_to_diff(self, arr):
         label = 'upper' if self.is_bwd else 'lower'
         desired = arr.diff(self.dim, n=1, label=label)
         actual = self.method(arr, self.dim, spacing=1)
@@ -86,15 +94,7 @@ class TestFwdDiff(FwdDiffTestCase):
 
     def test_various_slopes(self):
         for arr in [self.ones, self.zeros, self.arange, self.random]:
-            self.compar_to_diff(arr)
-
-    def test_output_coords(self):
-        for n in range(self.array_len - 1):
-            trunc = slice(n+1, None) if self.is_bwd else slice(0, -(n+1))
-            np.testing.assert_array_equal(
-                self.random[self.dim].isel(**{self.dim: trunc}),
-                self.method(self.random, self.dim, spacing=n+1)[self.dim]
-            )
+            self._compar_to_diff(arr)
 
 
 class TestBwdDiff(TestFwdDiff):
