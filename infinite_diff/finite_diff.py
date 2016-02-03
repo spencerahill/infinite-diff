@@ -70,16 +70,22 @@ class FiniteDiff(object):
         )
 
     @classmethod
-    def edges_one_sided(cls, arr, dim, spacing_left=1, spacing_right=1):
-        """One-sided differencing on array edges."""
-        left = arr.isel(**{dim: slice(0, spacing_left+1)})
-        right = arr.isel(**{dim: slice(-(spacing_right+1), None)})
-        diff_left = cls.fwd_diff(left, dim, spacing=spacing_left)
-        diff_right = cls.bwd_diff(right, dim, spacing=spacing_right)
-        return diff_left, diff_right
+    def diff_edge_one_sided(cls, arr, dim, side='left', spacing=1):
+        """One-sided differencing of array edge."""
+        if side == 'left':
+            trunc = {dim: slice(0, spacing+1)}
+            method = cls.fwd_diff
+        elif side == 'right':
+            trunc = {dim: slice(-(spacing+1), None)}
+            method = cls.bwd_diff
+        else:
+            raise ValueError("Parameter `side` must be either 'left' "
+                             "or 'right': {}").format(side)
+        arr_edge = arr.isel(**trunc)
+        return method(arr_edge, dim, spacing=spacing)
 
     @classmethod
-    def cen_diff(cls, arr, dim, spacing=1, do_edges_one_sided=False):
+    def cen_diff(cls, arr, dim, spacing=1, fill_edges=False):
         """Centered differencing of the DataArray or Dataset.
 
         :param arr: Data to be center-differenced.
@@ -87,10 +93,12 @@ class FiniteDiff(object):
         :param str dim: Dimension over which to perform the differencing.
         :param int spacing: How many gridpoints over to use.  Size of resulting
             array depends on this value.
-        :param do_edges_one_sided: Whether or not to fill in the edge cells
+        :param fill_edges: Whether or not to fill in the edge cells
             that don't have the needed neighbor cells for the stencil.  If
             `True`, use one-sided differencing with the same order of accuracy
             as `order`, and the outputted array is the same shape as `arr`.
+
+            If `'left'` or `'right'`, fill only that side.
 
             If `False`, the outputted array has a length in the computed axis
             reduced by `order`.
@@ -100,11 +108,14 @@ class FiniteDiff(object):
         left = arr.isel(**{dim: slice(0, -spacing)})
         right = arr.isel(**{dim: slice(spacing, None)})
         diff = cls.fwd_diff(right, dim) + cls.bwd_diff(left, dim)
-        if do_edges_one_sided:
-            diff_left, diff_right = cls.edges_one_sided(arr, dim,
-                                                        spacing_left=spacing,
-                                                        spacing_right=spacing)
-            diff = xr.concat([diff_left, diff, diff_right], dim=dim)
+        if fill_edges is True or fill_edges == 'left':
+            diff_left = cls.diff_edge_one_sided(arr, dim, side='left',
+                                                spacing=spacing)
+            diff = xr.concat([diff_left, diff], dim=dim)
+        if fill_edges is True or fill_edges == 'right':
+            diff_right = cls.diff_edge_one_sided(arr, dim, side='right',
+                                                 spacing=spacing)
+            diff = xr.concat([diff, diff_right], dim=dim)
         return diff
 
     @staticmethod
@@ -176,7 +187,7 @@ class FiniteDiff(object):
 
     @classmethod
     def cen_diff_deriv(cls, arr, dim, coord=None, spacing=1, order=2,
-                       do_edges_one_sided=False):
+                       fill_edges=False):
         """
         Centered differencing approximation of 1st derivative.
 
@@ -186,7 +197,7 @@ class FiniteDiff(object):
         :param xarray.DataArray coord: Coordinate array to use for the
             denominator.  If not given or None, arr[dim] is used.
         :param int order: Order of accuracy to use.  Default 2.
-        :param do_edges_one_sided: Whether or not to fill in the edge cells
+        :param fill_edge: Whether or not to fill in the edge cells
             that don't have the needed neighbor cells for the stencil.  If
             `True`, use one-sided differencing with the same order of accuracy
             as `order`, and the outputted array is the same shape as `arr`.
@@ -197,9 +208,9 @@ class FiniteDiff(object):
         arr_coord = cls.arr_coord(arr, dim, coord=coord)
         if order == 2:
             numer = cls.cen_diff(arr, dim, spacing=spacing,
-                                 do_edges_one_sided=do_edges_one_sided)
+                                 fill_edges=fill_edges)
             denom = cls.cen_diff(arr_coord, dim, spacing=spacing,
-                                 do_edges_one_sided=do_edges_one_sided)
+                                 fill_edges=fill_edges)
             return numer / denom
         elif order == 4:
             # Formula is (4/3)*cen_diff(spacing=1) - (1/3)*cen_diff(spacing=2)
@@ -208,10 +219,10 @@ class FiniteDiff(object):
             trunc = {dim: slice(spacing, -spacing)}
             return (4*cls.cen_diff_deriv(
                 arr.isel(**trunc), dim, coord=arr_coord.isel(**trunc),
-                spacing=spacing, order=2, do_edges_one_sided=do_edges_one_sided
+                spacing=spacing, order=2, fill_edges=fill_edges
             ) - cls.cen_diff_deriv(
                 arr, dim, coord=arr_coord, spacing=2*spacing, order=2,
-                do_edges_one_sided=do_edges_one_sided
+                fill_edges=fill_edges
             )) / 3.
         raise NotImplementedError("Centered differencing only "
                                   "supported for 2nd and 4th order.")
