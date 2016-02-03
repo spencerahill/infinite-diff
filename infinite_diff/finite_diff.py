@@ -243,7 +243,7 @@ class FiniteDiff(object):
 
     @classmethod
     def upwind_advec(cls, arr, flow, dim, coord=None, spacing=1, order=1,
-                     fill_edge=False, reverse_dim=False):
+                     reverse_dim=False, fill_edge=True):
         """
         Upwind differencing scheme for advection.
 
@@ -251,9 +251,9 @@ class FiniteDiff(object):
         :param flow: Flow that is advecting the field.
         """
         fwd = cls.fwd_diff_deriv(arr, dim, coord=coord, spacing=spacing,
-                                 order=order, fill_edge=fill_edge)
+                                 order=order, fill_edge=True)
         bwd = cls.bwd_diff_deriv(arr, dim, coord=coord, spacing=spacing,
-                                 order=order, fill_edge=fill_edge)
+                                 order=order, fill_edge=True)
         # Forward diff on left edge; backward diff on right edge.
         edge_right = {dim: -1}
         edge_left = {dim: 0}
