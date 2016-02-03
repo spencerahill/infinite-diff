@@ -134,29 +134,20 @@ class FwdDiffDerivTestCase(FiniteDiffTestCase):
 
 
 class TestFwdDiffDeriv(FwdDiffDerivTestCase):
-    def test_order1_spacing1_no_fill(self):
-        label = 'upper' if self.is_bwd else 'lower'
-        desired = (self.random.diff(self.dim, label=label) /
-                   self.random[self.dim].diff(self.dim, label=label))
-        actual = self.method(self.random, self.dim)
-        assert desired.identical(actual)
+    def test_output_coords_fill(self):
+        desired = self.random.coords.to_dataset()
+        for order in [1, 2]:
+            ans = self.method(self.random, self.dim, coord=None, spacing=1,
+                              order=order, fill_edge=True).coords.to_dataset()
+            assert ans.identical(desired)
 
-    def test_order1_spacing1_fill(self):
-        # Some parameters differ for fwd v. bwd diff.
-        label = 'upper' if self.is_bwd else 'lower'
-        edge_label = 'lower' if self.is_bwd else 'upper'
-        trunc = slice(0, 2) if self.is_bwd else slice(-2, None)
-        # concat_positions = [1, 0] if self.is_bwd else [0, 1]
-
-        interior = (self.random.diff(self.dim, label=label) /
-                    self.random[self.dim].diff(self.dim, label=label))
-        arr_edge = self.random.isel(**{self.dim: trunc})
-
-        edge = (arr_edge.diff(self.dim, label=edge_label) /
-                arr_edge[self.dim].diff(self.dim, label=edge_label))
-        desired = xr.concat([interior, edge], dim=self.dim)
-        actual = self.method(self.random, self.dim, fill_edge=True)
-        assert desired.identical(actual)
+    def test_output_coords_no_fill(self):
+        for order in [1, 2]:
+            trunc = slice(order, None) if self.is_bwd else slice(0, -order)
+            desired = self.random.coords.to_dataset().isel(**{self.dim: trunc})
+            ans = self.method(self.random, self.dim, coord=None, spacing=1,
+                              order=order, fill_edge=False).coords.to_dataset()
+            assert ans.identical(desired)
 
     def test_constant_slope(self, order=1):
         for n, arange in enumerate(self.arange_trunc[:-1]):
@@ -182,16 +173,29 @@ class TestFwdDiffDeriv(FwdDiffDerivTestCase):
             # Same, with fill_edge=True.
             ans = self.method(arange, self.dim, coord=None, spacing=1, order=2,
                               fill_edge=True)
-            np.testing.assert_array_equal(ans, self.ones_trunc[n+1])
+            np.testing.assert_array_equal(ans, self.ones_trunc[n])
 
-    def test_output_coords(self):
-        desired = self.random.coords.to_dataset()
-        ans = self.method(self.random, self.dim, coord=None, spacing=1,
-                          order=1, fill_edge=True).coords.to_dataset()
-        assert ans.identical(desired)
-        # ans = self.method(self.random, self.dim, coord=None, spacing=1,
-        #                   order=1, fill_edge=False).coords.to_dataset()
-        # assert ans.identical(desired.isel(
+    def test_order1_spacing1_no_fill(self):
+        label = 'upper' if self.is_bwd else 'lower'
+        desired = (self.random.diff(self.dim, label=label) /
+                   self.random[self.dim].diff(self.dim, label=label))
+        actual = self.method(self.random, self.dim)
+        assert desired.identical(actual)
+
+    def test_order1_spacing1_fill(self):
+        label = 'lower'
+        edge_label = 'upper'
+        trunc = slice(-2, None)
+
+        interior = (self.random.diff(self.dim, label=label) /
+                    self.random[self.dim].diff(self.dim, label=label))
+        arr_edge = self.random.isel(**{self.dim: trunc})
+
+        edge = (arr_edge.diff(self.dim, label=edge_label) /
+                arr_edge[self.dim].diff(self.dim, label=edge_label))
+        desired = xr.concat([interior, edge], dim=self.dim)
+        actual = self.method(self.random, self.dim, fill_edge=True)
+        assert desired.identical(actual)
 
 
 class TestBwdDiffDeriv(TestFwdDiffDeriv):
@@ -201,8 +205,20 @@ class TestBwdDiffDeriv(TestFwdDiffDeriv):
         self.is_bwd = True
 
     @unittest.skip("Needs to be implemented")
-    def test_coord_reverse(self):
-        pass
+    def test_order1_spacing1_fill(self):
+        label = 'upper'
+        edge_label = 'lower'
+        trunc = slice(0, 2)
+
+        interior = (self.random.diff(self.dim, label=label) /
+                    self.random[self.dim].diff(self.dim, label=label))
+        arr_edge = self.random.isel(**{self.dim: trunc})
+
+        edge = (arr_edge.diff(self.dim, label=edge_label) /
+                arr_edge[self.dim].diff(self.dim, label=edge_label))
+        desired = xr.concat([interior, edge], dim=self.dim)
+        actual = self.method(self.random, self.dim, fill_edge=True)
+        assert desired.identical(actual)
 
 
 class UpwindAdvecTestCase(FiniteDiffTestCase):
@@ -295,7 +311,5 @@ if __name__ == '__main__':
     sys.exit(unittest.main())
 
 
-# TODO: non-constant slope for fwd/bwd
-# TODO: centered differencing tests
-# TODO: derivative tests
-# TODO: upwind advection tests
+# TODO: centered differencing and derivs
+# TODO: non-unity spacing for derivatives and advection
