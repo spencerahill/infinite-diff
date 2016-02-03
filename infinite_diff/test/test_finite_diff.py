@@ -190,7 +190,6 @@ class TestFwdDiffDeriv(FwdDiffDerivTestCase):
         interior = (self.random.diff(self.dim, label=label) /
                     self.random[self.dim].diff(self.dim, label=label))
         arr_edge = self.random.isel(**{self.dim: trunc})
-
         edge = (arr_edge.diff(self.dim, label=edge_label) /
                 arr_edge[self.dim].diff(self.dim, label=edge_label))
         desired = xr.concat([interior, edge], dim=self.dim)
@@ -204,19 +203,15 @@ class TestBwdDiffDeriv(TestFwdDiffDeriv):
         self.method = FiniteDiff.bwd_diff_deriv
         self.is_bwd = True
 
-    @unittest.skip("Needs to be implemented")
     def test_order1_spacing1_fill(self):
-        label = 'upper'
-        edge_label = 'lower'
         trunc = slice(0, 2)
 
-        interior = (self.random.diff(self.dim, label=label) /
-                    self.random[self.dim].diff(self.dim, label=label))
+        interior = (FiniteDiff.bwd_diff(self.random, self.dim) /
+                    FiniteDiff.bwd_diff(self.random[self.dim], self.dim))
         arr_edge = self.random.isel(**{self.dim: trunc})
-
-        edge = (arr_edge.diff(self.dim, label=edge_label) /
-                arr_edge[self.dim].diff(self.dim, label=edge_label))
-        desired = xr.concat([interior, edge], dim=self.dim)
+        edge = (FiniteDiff.fwd_diff(arr_edge, self.dim) /
+                FiniteDiff.fwd_diff(arr_edge[self.dim], self.dim))
+        desired = xr.concat([edge, interior], dim=self.dim)
         actual = self.method(self.random, self.dim, fill_edge=True)
         assert desired.identical(actual)
 
@@ -268,48 +263,73 @@ class TestUpwindAdvec(UpwindAdvecTestCase):
         neg, pos = FiniteDiff.upwind_advec_flow(flow, reverse_dim=True)
         assert flow.identical(neg + pos)
 
-    def test_output_coords(self):
+    def test_output_coords_fill(self):
         desired = self.arange.coords.to_dataset()
-        for arr, zeros, dim, coord, spacing, order, fill in \
-            itertools.product(self.arrs, [self.zeros], self.dims,
-                              self.coords, self.spacings, self.orders,
-                              [True]):
-            ans = self.method(arr, zeros, dim, coord=coord,
-                              spacing=spacing, order=order, fill_edge=fill)
-            assert desired.identical(ans.coords.to_dataset())
+        for o in [1, 2]:
+            actual = self.method(self.random, self.random, self.dim, order=o,
+                                 fill_edge=True).coords.to_dataset()
+            assert desired.identical(actual)
+
+    def test_output_coords_no_fill(self):
+        o1 = self.arange.coords.to_dataset().isel(**{self.dim: slice(1, -1)})
+        o2 = self.arange.coords.to_dataset().isel(**{self.dim: slice(2, -2)})
+        for desired, o in zip([o1, o2], [1, 2]):
+            actual = self.method(self.random, self.random, self.dim, order=o,
+                                 fill_edge=False).coords.to_dataset()
+            assert desired.identical(actual)
 
     def test_zero_flow(self):
+
         for args in itertools.product(self.arrs, [self.zeros], self.dims,
                                       self.coords, self.spacings, self.orders,
                                       self.fill_edges):
             self.assertTrue(not np.any(self.method(*args)))
 
-    def test_unidirectional_flow(self):
+    def test_pos_flow(self):
         flow = np.abs(self.random)
-        np.testing.assert_array_equal(
-            flow * FiniteDiff.bwd_diff_deriv(
-                self.arange, self.dim, coord=None, spacing=1,
-                order=1, fill_edge=False
-            ).isel(**{self.dim: slice(1, None)}),
-            self.method(self.arange, flow, self.dim, coord=None,
-                        spacing=1, order=1, fill_edge=False)
+        # Do fill edge.
+        desired = flow * FiniteDiff.bwd_diff_deriv(
+            self.arange, self.dim, coord=None, spacing=1, order=1,
+            fill_edge=True
         )
-        flow *= -1
-        for order in (1, 2):
-            for fill_edge in [True, False]:
-                np.testing.assert_array_equal(
-                    flow * FiniteDiff.fwd_diff_deriv(
-                        self.arange, self.dim, coord=None, spacing=1,
-                        order=order, fill_edge=fill_edge
-                    ).isel(**{self.dim: slice(1, None)}),
-                    self.method(self.arange, flow, self.dim, coord=None,
-                                spacing=1, order=order, fill_edge=fill_edge)
-                )
+        actual = self.method(self.arange, flow, self.dim, coord=None,
+                             spacing=1, order=1, fill_edge=True)
+        assert desired.identical(actual)
+
+        # Do not fill edge.
+        desired = flow * FiniteDiff.bwd_diff_deriv(
+            self.arange, self.dim, coord=None, spacing=1, order=1,
+            fill_edge=False
+        ).isel(**{self.dim: slice(None, -1)})
+        actual = self.method(self.arange, flow, self.dim, coord=None,
+                             spacing=1, order=1, fill_edge=False)
+        assert desired.identical(actual)
+
+    def test_neg_flow(self):
+        flow = -1*np.abs(self.random)
+        # Do fill edge.
+        desired = flow * FiniteDiff.fwd_diff_deriv(
+            self.arange, self.dim, coord=None, spacing=1, order=1,
+            fill_edge=True
+        )
+        actual = self.method(self.arange, flow, self.dim, coord=None,
+                             spacing=1, order=1, fill_edge=True)
+        assert desired.identical(actual)
+
+        # Do not fill edge.
+        desired = flow * FiniteDiff.fwd_diff_deriv(
+            self.arange, self.dim, coord=None, spacing=1, order=1,
+            fill_edge=False
+        ).isel(**{self.dim: slice(1, None)})
+        actual = self.method(self.arange, flow, self.dim, coord=None,
+                             spacing=1, order=1, fill_edge=False)
+        assert desired.identical(actual)
 
 
 if __name__ == '__main__':
     sys.exit(unittest.main())
 
-
+# TODO: non-default coord values
 # TODO: centered differencing and derivs
 # TODO: non-unity spacing for derivatives and advection
+# TODO: comparison of derivatives to analytical solutions, e.g. sin/cos, e^x
