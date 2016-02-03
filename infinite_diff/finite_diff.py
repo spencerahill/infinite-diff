@@ -148,7 +148,7 @@ class FiniteDiff(object):
             interior = 2*single_space - double_space
             if not fill_edge:
                 return interior
-            right_edge = {dim: slice(-spacing, None)}
+            right_edge = {dim: slice(-order*spacing, None)}
             return xr.concat([interior, single_space.isel(**right_edge)],
                              dim=dim)
         raise NotImplementedError("Forward differencing derivative only "
