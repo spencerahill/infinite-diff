@@ -53,14 +53,14 @@ class FiniteDiff(object):
         arr = self._find_arr(arr)
         return self._slice_arr_dim(slice(-1, None, -1), arr=arr)
 
-    def _diff(self):
+    def _diff(self, spacing=1):
         raise NotImplementedError
 
-    def _diff_rev(self):
+    def _diff_rev(self, spacing=1):
         raise NotImplementedError
 
-    def diff(self):
+    def diff(self, spacing=1):
         raise NotImplementedError
 
-    def diff_rev(self):
+    def diff_rev(self, spacing=1):
         raise NotImplementedError
