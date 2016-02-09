@@ -6,7 +6,8 @@ import xarray as xr
 
 
 class TestCase(unittest.TestCase):
-    pass
+    def assertDatasetIdentical(self, d1, d2):
+        assert d1.identical(d2), (d1, d2)
 
 
 class InfiniteDiffTestCase(TestCase):
