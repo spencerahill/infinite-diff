@@ -25,8 +25,6 @@ class CenDiff(FiniteDiff):
         arr_edge = self._slice_arr_dim(trunc)
         return method(arr=arr_edge)
 
-    # def _concat(self, left, center, right):
-
     def diff(self, arr=None, spacing=1, fill_edge=False):
         """Centered differencing of the DataArray or Dataset.
 
@@ -44,8 +42,8 @@ class CenDiff(FiniteDiff):
         self._check_spacing(spacing)
         self._check_arr_len(arr=arr, spacing=2*spacing, pad=1)
 
-        left = self._slice_arr_dim(slice(0, -spacing))
-        right = self._slice_arr_dim(slice(spacing, None))
+        left = self._slice_arr_dim(slice(0, -spacing), arr=arr)
+        right = self._slice_arr_dim(slice(spacing, None), arr=arr)
         interior = (self._diff_fwd(arr=right, spacing=spacing) +
                     self._diff_bwd(arr=left, spacing=spacing))
 

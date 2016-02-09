@@ -34,9 +34,11 @@ class TestFiniteDiff(InfiniteDiffTestCase):
         fd_len0 = self.cls(self.ones.isel(**{self.dim: 0}), self.dim)
         self.assertRaises(ValueError, fd_len0._check_arr_len)
 
-    @unittest.skip("Needs to be implemented")
     def test_slice_arr_dim(self):
-        pass
+        slice_ = slice(1, -2)
+        actual = self.cls(self.ones, self.dim)._slice_arr_dim(slice_, None)
+        self.assertDatasetIdentical(actual,
+                                    self.ones.isel(**{self.dim: slice_}))
 
     def test_reverse_dim(self):
         values = np.arange(self.array_len)
@@ -45,7 +47,7 @@ class TestFiniteDiff(InfiniteDiffTestCase):
         actual = self.cls(arr, self.dim)._reverse_dim()
         desired = xr.DataArray(values[::-1], dims=[self.dim],
                                coords={self.dim: values[::-1]})
-        assert actual.identical(desired)
+        self.assertDatasetIdentical(actual, desired)
 
     def test_diff_not_implemented(self):
         self.assertRaises(NotImplementedError,
@@ -71,31 +73,31 @@ class TestFwdDiff(FwdDiffTestCase):
         for n, ones in enumerate(self.ones_trunc[:-2]):
             actual = self.cls(ones, self.dim).diff()
             desired = self.zeros_trunc[n+1]
-            assert actual.identical(desired)
+            self.assertDatasetIdentical(actual, desired)
 
     def test_diff_zero_slope_varied_spacing(self):
         for n, ones in enumerate(self.ones_trunc[:-1]):
             actual = self.cls(self.ones, self.dim).diff(spacing=n+1)
             desired = self.zeros_trunc[n]
-            assert actual.identical(desired)
+            self.assertDatasetIdentical(actual, desired)
 
     def test_diff_const_slope_varied_arr_len(self):
         for n, arange in enumerate(self.arange_trunc[:-2]):
             actual = self.cls(arange, self.dim).diff()
             desired = self.ones_trunc[n+1]
-            assert actual.identical(desired)
+            self.assertDatasetIdentical(actual, desired)
 
     def test_diff_const_slope_varied_spacing(self):
         for n, ones in enumerate(self.ones_trunc[:-1]):
             actual = self.cls(self.arange, self.dim).diff(spacing=n+1)
             desired = (n+1)*ones
-            assert actual.identical(desired)
+            self.assertDatasetIdentical(actual, desired)
 
     def _compar_to_diff(self, arr):
         label = 'upper' if self.is_bwd else 'lower'
         actual = self.cls(arr, self.dim).diff()
         desired = arr.diff(self.dim, n=1, label=label)
-        assert actual.identical(desired)
+        self.assertDatasetIdentical(actual, desired)
 
     def test_diff_misc_slopes(self):
         for arr in [self.ones, self.zeros, self.arange, self.random]:
@@ -145,25 +147,25 @@ class TestCenDiff(CenDiffTestCase):
         for n, ones in enumerate(self.ones_trunc[:-2]):
             actual = self.cls(ones, self.dim).diff()
             desired = self.zeros_trunc[n+1]
-            assert actual.identical(desired)
+            self.assertDatasetIdentical(actual, desired)
 
     def test_diff_zero_slope_varied_spacing(self):
         for n, ones in enumerate(self.ones_trunc[:-1]):
             actual = self.cls(self.ones, self.dim).diff(spacing=n+1)
             desired = self.zeros_trunc[n]
-            assert actual.identical(desired)
+            self.assertDatasetIdentical(actual, desired)
 
     def test_diff_const_slope_varied_arr_len(self):
         for n, arange in enumerate(self.arange_trunc[:-2]):
             actual = self.cls(arange, self.dim).diff()
             desired = 2*self.ones_trunc[n+1]
-            assert actual.identical(desired)
+            self.assertDatasetIdentical(actual, desired)
 
     def test_diff_const_slope_varied_spacing(self):
         for n, ones in enumerate(self.ones_trunc[:-1]):
             actual = self.cls(self.arange, self.dim).diff(spacing=n+1)
             desired = 2*(n+1)*ones
-            assert actual.identical(desired)
+            self.assertDatasetIdentical(actual, desired)
 
     def _compar_to_diff(self, arr):
         actual = self.cls(arr, self.dim).diff()
@@ -171,7 +173,7 @@ class TestCenDiff(CenDiffTestCase):
                           arr.isel(**{self.dim: slice(None, -2)})).values
         desired = xr.DataArray(desired_values, dims=actual.dims,
                                coords=actual.coords)
-        assert actual.identical(desired)
+        self.assertDatasetIdentical(actual, desired)
 
     def test_diff_misc_slopes(self):
         for arr in [self.ones, self.zeros, self.arange, self.random]:
