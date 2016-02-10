@@ -57,6 +57,10 @@ class TestCenAdvec(CenAdvecTestCase, TestAdvec):
         actual = self.advec_obj._arr_gradient()
         self.assertDatasetIdentical(actual, desired)
 
+    @unittest.skip("To be implemented")
+    def test_advec(self):
+        pass
+
     # def test_advec_zero_flow(self):
         # pass
 
