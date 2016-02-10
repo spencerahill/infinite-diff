@@ -22,5 +22,5 @@ class FiniteDeriv(object):
         return self._diff(spacing=spacing) / self._diff(arr=self.coord,
                                                         spacing=spacing)
 
-    def deriv(self):
+    def deriv(self, spacing=1, order=1, fill_edge=True):
         raise NotImplementedError

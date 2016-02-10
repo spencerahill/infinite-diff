@@ -1,5 +1,3 @@
-import unittest
-
 import xarray as xr
 
 from infinite_diff import FiniteDiff, OneSidedDiff, BwdDiff, FwdDiff, CenDiff
