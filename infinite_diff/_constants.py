@@ -1,0 +1,2 @@
+_PFULL_STR = 'pfull'
+_RADEARTH = 6370997.
