@@ -7,24 +7,9 @@ from infinite_diff.coord import VertCoord, ZCoord, Pressure, Sigma, Eta
 from . import InfiniteDiffTestCase
 
 
-class CoordTestCase(InfiniteDiffTestCase):
-    def _make_coord_obj(self):
-        return self.coord_cls(self.arr, dim=self.dim, cyclic=self.cyclic)
-
-    def setUp(self):
-        super(CoordTestCase, self).setUp()
-        self.arr = self.arange
-        self.cyclic = False
-        self.coord_cls = Coord
-
-
-class TestCoord(CoordTestCase):
-    def setUp(self):
-        super(TestCoord, self).setUp()
-        self.coord_obj = self._make_coord_obj()
-
+class CoordSharedTests(object):
     def test_init(self):
-        self.assertIsInstance(self.coord_obj, self.coord_cls)
+        self.assertIsInstance(self.coord_obj, self._COORD_CLS)
         self.assertDatasetIdentical(self.coord_obj._arr, self.arr)
 
     def test_getitem(self):
@@ -39,29 +24,42 @@ class TestCoord(CoordTestCase):
         self.assertNotImplemented(self.coord_obj.deriv_factor)
 
 
+class CoordTestCase(InfiniteDiffTestCase):
+    _COORD_CLS = Coord
+    _CYCLIC = False
+
+    def setUp(self):
+        super(CoordTestCase, self).setUp()
+        self.arr = self.arange
+        self.coord_obj = Coord(self.arr, dim=self.dim, cyclic=self._CYCLIC)
+
+
+class TestCoord(CoordTestCase, CoordSharedTests):
+    pass
+
+
 class HorizCoordTestCase(CoordTestCase):
+    _COORD_CLS = HorizCoord
+
     def setUp(self):
         super(HorizCoordTestCase, self).setUp()
-        self.coord_cls = HorizCoord
+        self.coord_obj = HorizCoord(self.arr, dim=self.dim,
+                                    cyclic=self._CYCLIC)
 
 
 class TestHorizCoord(HorizCoordTestCase, TestCoord):
-    def setUp(self):
-        super(TestHorizCoord, self).setUp()
-        self.coord_obj = self._make_coord_obj()
+    pass
 
 
 class XCoordTestCase(HorizCoordTestCase):
+    _COORD_CLS = XCoord
+
     def setUp(self):
         super(XCoordTestCase, self).setUp()
-        self.coord_cls = XCoord
+        self.coord_obj = XCoord(self.arr, dim=self.dim, cyclic=self._CYCLIC)
 
 
 class TestXCoord(XCoordTestCase, TestHorizCoord):
-    def setUp(self):
-        super(TestXCoord, self).setUp()
-        self.coord_obj = self._make_coord_obj()
-
     def test_deriv_prefactor(self):
         self.assertEqual(self.coord_obj.deriv_prefactor(), 1.)
 
@@ -70,46 +68,42 @@ class TestXCoord(XCoordTestCase, TestHorizCoord):
 
 
 class YCoordTestCase(XCoordTestCase):
+    _COORD_CLS = YCoord
+
     def setUp(self):
         super(YCoordTestCase, self).setUp()
-        self.coord_cls = YCoord
 
 
 class TestYCoord(YCoordTestCase, TestXCoord):
     def setUp(self):
-        super(TestXCoord, self).setUp()
-        self.coord_obj = self._make_coord_obj()
+        super(TestYCoord, self).setUp()
+        self.coord_obj = YCoord(self.arr, dim=self.dim, cyclic=self._CYCLIC)
 
 
 class LonTestCase(XCoordTestCase):
+    _COORD_CLS = Lon
+    _CYCLIC = True
+
     def setUp(self):
         super(LonTestCase, self).setUp()
-        self.cyclic = True
-        self.coord_cls = Lon
+        self.coord_obj = Lon(self.arr, dim=self.dim, cyclic=self._CYCLIC)
 
 
 class TestLon(LonTestCase, TestXCoord):
-    def setUp(self):
-        super(TestLon, self).setUp()
-        self.coord_obj = self._make_coord_obj()
-
     @unittest.skip("Not implemented yet")
     def test_deriv_prefactor(self):
         raise NotImplementedError
 
 
-class LatTestCase(LonTestCase):
+class LatTestCase(YCoordTestCase):
+    _COORD_CLS = Lat
+
     def setUp(self):
         super(LatTestCase, self).setUp()
-        self.cyclic = True
-        self.coord_cls = Lat
+        self.coord_obj = Lat(self.arr, dim=self.dim, cyclic=self._CYCLIC)
 
 
-class TestLat(LatTestCase, TestLon):
-    def setUp(self):
-        super(TestLat, self).setUp()
-        self.coord_obj = self._make_coord_obj()
-
+class TestLat(LatTestCase, TestYCoord):
     @unittest.skip("Not implemented yet")
     def test_deriv_prefactor(self):
         raise NotImplementedError
@@ -120,71 +114,67 @@ class TestLat(LatTestCase, TestLon):
 
 
 class VertCoordTestCase(CoordTestCase):
-    def _make_coord_obj(self):
-        return self.coord_cls(self.arr, dim=self.dim)
+    _COORD_CLS = VertCoord
+    _CYCLIC = False
 
     def setUp(self):
         super(VertCoordTestCase, self).setUp()
-        self.coord_cls = VertCoord
+        self.coord_obj = VertCoord(self.arr, dim=self.dim)
 
 
 class TestVertCoord(VertCoordTestCase, TestCoord):
-    def setUp(self):
-        super(TestVertCoord, self).setUp()
-        self.coord_obj = self._make_coord_obj()
+    pass
 
 
 class ZCoordTestCase(VertCoordTestCase):
+    _COORD_CLS = ZCoord
+
     def setUp(self):
         super(ZCoordTestCase, self).setUp()
-        self.coord_cls = ZCoord
+        self.coord_obj = ZCoord(self.arr, dim=self.dim)
 
 
-class TestZCoord(ZCoordTestCase, TestCoord):
-    def setUp(self):
-        super(TestZCoord, self).setUp()
-        self.coord_obj = self._make_coord_obj()
+class TestZCoord(ZCoordTestCase, TestVertCoord):
+    pass
 
 
 class PressureTestCase(VertCoordTestCase):
+    _COORD_CLS = Pressure
+
     def setUp(self):
         super(PressureTestCase, self).setUp()
-        self.coord_cls = Pressure
+        self.coord_obj = Pressure(self.arr, dim=self.dim)
 
 
-class TestPressure(PressureTestCase, TestCoord):
-    def setUp(self):
-        super(TestPressure, self).setUp()
-        self.coord_obj = self._make_coord_obj()
+class TestPressure(PressureTestCase, TestVertCoord):
+    pass
 
 
 class SigmaTestCase(VertCoordTestCase):
+    _COORD_CLS = Sigma
+
     def setUp(self):
         super(SigmaTestCase, self).setUp()
-        self.coord_cls = Sigma
+        self.coord_obj = Sigma(self.arr, self.arr, dim=self.dim)
 
 
-class TestSigma(SigmaTestCase, TestCoord):
-    def setUp(self):
-        super(TestSigma, self).setUp()
-        self.coord_obj = self._make_coord_obj()
+class TestSigma(SigmaTestCase, TestVertCoord):
+    pass
 
 
 class EtaTestCase(VertCoordTestCase):
-    def _make_coord_obj(self, pk, bk):
-        return self.coord_cls(self.arr, pk, bk, dim=self.dim)
+    _COORD_CLS = Eta
 
     def setUp(self):
         super(EtaTestCase, self).setUp()
         self.pk = []
         self.bk = []
-        self.coord_cls = Eta
+        self.coord_obj = Eta(self.arr, self.pk, self.bk, dim=self.dim)
 
 
-class TestEta(EtaTestCase, TestCoord):
-    def setUp(self):
-        super(TestEta, self).setUp()
-        self.coord_obj = self._make_coord_obj(self.pk, self.bk)
+class TestEta(EtaTestCase, TestVertCoord):
+    pass
+
 
 if __name__ == '__main__':
     sys.exit(unittest.main())
