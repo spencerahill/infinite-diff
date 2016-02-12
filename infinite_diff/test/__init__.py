@@ -41,9 +41,6 @@ class InfiniteDiffTestCase(unittest.TestCase):
                                                  slice(None, -(n+1))})
                              for n in range(self.array_len)]
 
-    def tearDown(self):
-        pass
-
     def assertDatasetIdentical(self, d1, d2):
         assert d1.identical(d2), (d1, d2)
 
