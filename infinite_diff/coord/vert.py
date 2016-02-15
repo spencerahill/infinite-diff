@@ -1,5 +1,15 @@
 """Vertically oriented coordinates."""
+from .._constants import PHALF_STR, PFULL_STR
+from ..diff import CenDiff
 from . import Coord
+
+
+def replace_coord(arr, old_dim, new_dim, new_coord):
+    """Replace a coordinate with new one; new and old must have same shape."""
+    new_arr = arr.rename({old_dim: new_dim})
+    ds = new_arr.to_dataset(name='new_arr')
+    ds[new_dim] = new_coord
+    return ds['new_arr']
 
 
 class VertCoord(Coord):
@@ -41,12 +51,47 @@ class Sigma(VertCoord):
 class Eta(VertCoord):
     """Hybrid sigma-pressure vertical coordinates."""
     def __init__(self, *args, **kwargs):
-        p_ref = args[0]
+        self.pk = args[0]
         self.bk = args[1]
-        self.pk = args[2]
-        dim = kwargs.get('dim', None)
-        super(Eta, self).__init__(p_ref, dim=dim)
+        self.pfull = args[2]
+        self.phalf = self.pk[PHALF_STR]
+        self.dim = kwargs.get('dim', None)
 
-    def pressure(self, ps):
-        """Compute pressure from surface pressure and eta coordinate arrays."""
+    def phalf_from_ps(self, ps):
+        """Compute pressure at level edges from surface pressure."""
         return self.pk + self.bk*ps
+
+    def to_pfull_from_phalf(self, arr):
+        """Compute data at full pressure levels from values at half levels."""
+        arr_top = arr[{PHALF_STR: slice(1, None)}]
+        arr_top = replace_coord(arr_top, PHALF_STR, PFULL_STR, self.pfull)
+
+        arr_bot = arr[{PHALF_STR: slice(None, -1)}]
+        arr_bot = replace_coord(arr_bot, PHALF_STR, PFULL_STR, self.pfull)
+        return 0.5*(arr_bot + arr_top)
+
+    def pfull_from_ps(self, ps):
+        """Compute pressure at full levels from surface pressure."""
+        return self.to_pfull_from_phalf(self.phalf_from_ps(ps))
+
+    def d_deta_from_phalf(self, arr):
+        """Compute pressure level thickness from half level pressures."""
+        d_deta = arr.diff(dim=PHALF_STR, n=1)
+        return replace_coord(d_deta, PHALF_STR, PFULL_STR, self.pfull)
+
+    def d_deta_from_pfull(self, arr):
+        """Compute $\partial/\partial\eta$ of the array on full hybrid levels.
+
+        $\eta$ is the model vertical coordinate, and its value is assumed to
+        simply increment by 1 from 0 at the surface upwards.  The data to be
+        differenced is assumed to be defined at full pressure levels.
+        """
+        deriv = CenDiff(arr, PFULL_STR, fill_edge=True) / 2.
+        # Edges use 1-sided differencing, so only spanning one level, not two.
+        deriv[{PFULL_STR: 0}] = deriv[{PFULL_STR: 0}] * 2.
+        deriv[{PFULL_STR: -1}] = deriv[{PFULL_STR: -1}] * 2.
+        return deriv
+
+    def dp_from_ps(self, ps):
+        """Compute pressure level thickness from surface pressure"""
+        return self.d_deta_from_phalf(self.phalf_from_ps(ps))

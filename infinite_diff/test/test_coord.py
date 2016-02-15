@@ -1,6 +1,9 @@
 import sys
 import unittest
 
+from aospy.utils import to_radians
+import numpy as np
+
 from infinite_diff.coord import Coord, HorizCoord, XCoord, YCoord, Lon, Lat
 from infinite_diff.coord import VertCoord, ZCoord, Pressure, Sigma, Eta
 
@@ -13,9 +16,9 @@ class CoordSharedTests(object):
         self.assertDatasetIdentical(self.coord_obj._arr, self.arr)
 
     def test_getitem(self):
-        for key in range(self.array_len):
-            self.assertDatasetIdentical(self.coord_obj[:, key],
-                                        self.coord_obj._arr[:, key])
+        for key in range(len(self.arr)):
+            self.assertDatasetIdentical(self.coord_obj[key],
+                                        self.coord_obj._arr[key])
 
     def test_deriv_prefactor(self):
         self.assertNotImplemented(self.coord_obj.deriv_prefactor)
@@ -86,13 +89,16 @@ class LonTestCase(XCoordTestCase):
 
     def setUp(self):
         super(LonTestCase, self).setUp()
+        self.arr = self.lon
+        self.dim = 'lon'
         self.coord_obj = Lon(self.arr, dim=self.dim, cyclic=self._CYCLIC)
 
 
 class TestLon(LonTestCase, TestXCoord):
-    @unittest.skip("Not implemented yet")
     def test_deriv_prefactor(self):
-        raise NotImplementedError
+        desired = 1. / (self.coord_obj.radius * np.cos(to_radians(self.lat)))
+        actual = self.coord_obj.deriv_prefactor(self.lat)
+        self.assertDatasetIdentical(actual, desired)
 
 
 class LatTestCase(YCoordTestCase):
@@ -100,17 +106,31 @@ class LatTestCase(YCoordTestCase):
 
     def setUp(self):
         super(LatTestCase, self).setUp()
+        self.arr = self.lat
+        self.dim = 'lat'
         self.coord_obj = Lat(self.arr, dim=self.dim, cyclic=self._CYCLIC)
 
 
 class TestLat(LatTestCase, TestYCoord):
-    @unittest.skip("Not implemented yet")
     def test_deriv_prefactor(self):
-        raise NotImplementedError
+        # Gradient
+        desired = 1. / self.coord_obj.radius
+        actual = self.coord_obj.deriv_prefactor()
+        self.assertEqual(actual, desired)
+        # Divergence
+        desired = 1. / (self.coord_obj.radius*np.cos(self.coord_obj._lat_rad))
+        actual = self.coord_obj.deriv_prefactor(oper='divg')
+        self.assertDatasetIdentical(actual, desired)
 
-    @unittest.skip("Not implemented yet")
     def test_deriv_factor(self):
-        raise NotImplementedError
+        # Gradient
+        desired = 1.
+        actual = self.coord_obj.deriv_factor()
+        self.assertEqual(actual, desired)
+        # Divergence
+        desired = np.cos(self.coord_obj._lat_rad)
+        actual = self.coord_obj.deriv_factor(oper='divg')
+        self.assertDatasetIdentical(actual, desired)
 
 
 class VertCoordTestCase(CoordTestCase):
@@ -143,6 +163,8 @@ class PressureTestCase(VertCoordTestCase):
 
     def setUp(self):
         super(PressureTestCase, self).setUp()
+        self.arr = self.pressure
+        self.dim = 'pressure'
         self.coord_obj = Pressure(self.arr, dim=self.dim)
 
 
@@ -155,7 +177,9 @@ class SigmaTestCase(VertCoordTestCase):
 
     def setUp(self):
         super(SigmaTestCase, self).setUp()
-        self.coord_obj = Sigma(self.arr, self.arr, dim=self.dim)
+        self.arr = self.sigma
+        self.dim = 'sigma'
+        self.coord_obj = Sigma(self.arr, dim=self.dim)
 
 
 class TestSigma(SigmaTestCase, TestVertCoord):
@@ -167,9 +191,10 @@ class EtaTestCase(VertCoordTestCase):
 
     def setUp(self):
         super(EtaTestCase, self).setUp()
-        self.pk = []
-        self.bk = []
-        self.coord_obj = Eta(self.arr, self.pk, self.bk, dim=self.dim)
+        self.arr = self.phalf
+        self.dim = 'phalf'
+        self.coord_obj = Eta(self.arr, self.pk, self.bk, self.pfull,
+                             dim=self.dim)
 
 
 class TestEta(EtaTestCase, TestVertCoord):
