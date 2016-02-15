@@ -1,5 +1,10 @@
+from ..diff import FiniteDiff
+
+
 class FiniteDeriv(object):
     """Base class for finite-diff based derivative classes."""
+    _DIFF_CLS = FiniteDiff
+
     def _arr_coord(self, coord):
         """Get the coord to be used as the denominator for a derivative."""
         if coord is None:
@@ -17,10 +22,21 @@ class FiniteDeriv(object):
         self.dim = dim
         self.coord = self._arr_coord(coord)
 
+        self._arr_diff_obj = self._DIFF_CLS(arr, dim)
+        self._coord_diff_obj = self._DIFF_CLS(self.coord, dim)
+        self._arr_diff = self._arr_diff_obj.diff
+        self._coord_diff = self._coord_diff_obj.diff
+
     def _deriv(self, spacing=1):
         """Core finite-differencing derivative; no edge handling."""
-        return self._diff(spacing=spacing) / self._diff(arr=self.coord,
-                                                        spacing=spacing)
+        return (self._arr_diff(spacing=spacing) /
+                self._coord_diff(spacing=spacing))
+
+    def _slice_edge(self, arr, spacing, order, pad=1):
+        raise NotImplementedError
+
+    def _concat(self):
+        raise NotImplementedError
 
     def deriv(self, spacing=1, order=1, fill_edge=True):
         raise NotImplementedError

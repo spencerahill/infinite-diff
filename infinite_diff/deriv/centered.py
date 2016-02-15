@@ -7,6 +7,8 @@ from . import FiniteDeriv, FwdDeriv, BwdDeriv
 
 
 class CenDeriv(FiniteDeriv):
+    _DIFF_CLS = CenDiff
+
     """Derivatives computed via centered finite differencing."""
     def __init__(self, arr, dim, coord=None):
         """
@@ -17,9 +19,6 @@ class CenDeriv(FiniteDeriv):
             denominator.  If not given or None, arr[dim] is used.
         """
         super(CenDeriv, self).__init__(arr, dim, coord=coord)
-        self._fin_diff_obj = CenDiff(arr, dim)
-        self._diff = self._fin_diff_obj.diff
-
         self._deriv_fwd_obj = FwdDeriv(arr, dim, coord=coord)
         self._deriv_bwd_obj = BwdDeriv(arr, dim, coord=coord)
 
