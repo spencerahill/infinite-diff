@@ -8,6 +8,9 @@ class HorizVertGeom(object):
     def __init__(self, horiz_geom, vert_coord):
         self._horiz_geom = horiz_geom
         self._vert_coord = vert_coord
+        self.x = self._horiz_geom.x
+        self.y = self._horiz_geom.y
+        self.z = self._vert_coord
         self.d_dx = self._horiz.d_dx
         self.d_dy = self._horiz.d_dy
         self.horiz_grad = self._horiz_geom.grad

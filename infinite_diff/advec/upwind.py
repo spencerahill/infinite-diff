@@ -35,6 +35,14 @@ class Upwind(Advec):
             return flow_neg, flow_pos
         return flow_pos, flow_neg
 
+    def _swap_bwd_fwd_edges(self, bwd, fwd):
+        """Forward diff on left edge; backward diff on right edge."""
+        edge_left = {self.dim: 0}
+        edge_right = {self.dim: -1}
+        bwd[edge_left] = fwd[edge_left]
+        fwd[edge_right] = bwd[edge_right]
+        return bwd, fwd
+
     def _derivs_bwd_fwd(self):
         """Generate forward and backward differencing derivs for upwind.
 
@@ -49,11 +57,7 @@ class Upwind(Advec):
         fwd = self._deriv_fwd(spacing=self.spacing, order=self.order,
                               fill_edge=True)
         # Forward diff on left edge; backward diff on right edge.
-        edge_left = {self.dim: 0}
-        edge_right = {self.dim: -1}
-        bwd[edge_left] = fwd[edge_left]
-        fwd[edge_right] = bwd[edge_right]
-        return bwd, fwd
+        return self._swap_bwd_fwd_edges(bwd, fwd)
 
     def advec(self):
         """
@@ -70,5 +74,5 @@ class Upwind(Advec):
         advec_arr = pos*bwd + neg*fwd
         if not self.fill_edge:
             slice_middle = {self.dim: slice(self.order, -self.order)}
-            advec_arr = advec_arr.isel(**slice_middle)
+            advec_arr = advec_arr[slice_middle]
         return advec_arr
