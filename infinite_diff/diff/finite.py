@@ -28,7 +28,7 @@ class FiniteDiff(object):
 
     def _find_arr(self, arr):
         if arr is None:
-            arr = self.arr
+            return self.arr
         return arr
 
     def _check_arr_len(self, arr=None, spacing=1, pad=1):
@@ -53,14 +53,14 @@ class FiniteDiff(object):
         arr = self._find_arr(arr)
         return self._slice_arr_dim(slice(-1, None, -1), arr=arr)
 
-    def _diff(self, spacing=1):
+    def _diff(self, arr=None, spacing=1):
         raise NotImplementedError
 
-    def _diff_rev(self, spacing=1):
+    def _diff_rev(self, arr=None, spacing=1):
         raise NotImplementedError
 
-    def diff(self, spacing=1):
+    def diff(self, arr=None, spacing=1):
         raise NotImplementedError
 
-    def diff_rev(self, spacing=1):
+    def diff_rev(self, arr=None, spacing=1):
         raise NotImplementedError

@@ -6,10 +6,13 @@ from . import FiniteDiff, BwdDiff, FwdDiff
 
 class CenDiff(FiniteDiff):
     """Centered finite differencing."""
+    _DIFF_BWD_CLS = BwdDiff
+    _DIFF_FWD_CLS = FwdDiff
+
     def __init__(self, arr, dim):
         super(CenDiff, self).__init__(arr, dim)
-        self._diff_bwd = BwdDiff(arr, dim).diff
-        self._diff_fwd = FwdDiff(arr, dim).diff
+        self._diff_bwd = self._DIFF_BWD_CLS(arr, dim).diff
+        self._diff_fwd = self._DIFF_FWD_CLS(arr, dim).diff
 
     def _diff_edge(self, spacing=1, side='left'):
         """One-sided differencing of array edge."""
@@ -25,7 +28,7 @@ class CenDiff(FiniteDiff):
         arr_edge = self._slice_arr_dim(trunc)
         return method(arr=arr_edge)
 
-    def diff(self, arr=None, spacing=1, fill_edge=False):
+    def diff(self, spacing=1, fill_edge=False):
         """Centered differencing of the DataArray or Dataset.
 
         :param fill_edge: Whether or not to fill in the edge cells
@@ -38,14 +41,13 @@ class CenDiff(FiniteDiff):
             If `False`, the outputted array has a length in the computed axis
             reduced by `order`.
         """
-        arr = self._find_arr(arr)
         self._check_spacing(spacing)
-        self._check_arr_len(arr=arr, spacing=2*spacing, pad=1)
+        self._check_arr_len(spacing=2*spacing, pad=1)
 
-        left = self._slice_arr_dim(slice(0, -spacing), arr=arr)
-        right = self._slice_arr_dim(slice(spacing, None), arr=arr)
-        interior = (self._diff_fwd(arr=right, spacing=spacing) +
-                    self._diff_bwd(arr=left, spacing=spacing))
+        left = self._slice_arr_dim(slice(0, -spacing))
+        right = self._slice_arr_dim(slice(spacing, None))
+        interior = (self._DIFF_FWD_CLS(right, self.dim).diff(spacing=spacing) +
+                    self._DIFF_BWD_CLS(left, self.dim).diff(spacing=spacing))
 
         if fill_edge in ('left', 'both'):
             diff_left = self._diff_edge(side='left')

@@ -9,21 +9,27 @@ class OneSidedDiff(FiniteDiff):
     def __init__(self, arr, dim):
         super(OneSidedDiff, self).__init__(arr, dim)
 
-    def _diff(self, arr=None, spacing=1):
+    def _diff(self, spacing=1):
         """One-sided differencing."""
-        arr = self._find_arr(arr)
         self._check_spacing(spacing)
-        self._check_arr_len(arr=arr, spacing=spacing)
-        left = self._slice_arr_dim(slice(0, -spacing), arr=arr)
-        right = self._slice_arr_dim(slice(spacing, None), arr=arr)
+        self._check_arr_len(spacing=spacing)
+        left = self._slice_arr_dim(slice(0, -spacing))
+        right = self._slice_arr_dim(slice(spacing, None))
         return xr.DataArray(right.values, dims=left.dims,
                             coords=left.coords) - left
 
-    def _diff_rev(self, arr=None, spacing=1):
+    def _diff_rev(self, spacing=1):
         """One sided differencing in the opposite direction."""
-        arr = self._find_arr(arr)
-        arr = self._reverse_dim(arr=arr)
-        return -1*self._reverse_dim(arr=self._diff(arr=arr, spacing=spacing))
+        arr = self._reverse_dim(self.arr)
+        return -1*self._reverse_dim(
+            self.__class__(arr, self.dim)._diff(spacing=spacing)
+        )
+
+    def diff(self, arr=None, spacing=1):
+        raise NotImplementedError
+
+    def diff_rev(self, arr=None, spacing=1):
+        raise NotImplementedError
 
 
 class FwdDiff(OneSidedDiff):
