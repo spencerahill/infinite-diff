@@ -1,21 +1,32 @@
 """Upwind advection.
 
-See https://en.wikipedia.org/wiki/Upwind_scheme for formulae of upwind schemes
-of first, second, and third order accuracy.
+Upwind advection uses one-sided differencing in the upstream direction of the
+flow to compute the tracer field derivative.  See
+https://en.wikipedia.org/wiki/Upwind_scheme for formulae of upwind schemes of
+first, second, and third order accuracy.
 """
-from .. import FwdDeriv, BwdDeriv
+from ..deriv import FwdDeriv, BwdDeriv
 from . import Advec
 
 
 class Upwind(Advec):
+    """Upwind advection."""
+    _DERIV_BWD_CLS = BwdDeriv
+    _DERIV_FWD_CLS = FwdDeriv
+
     def __init__(self, flow, arr, dim, coord=None, spacing=1, order=2,
                  fill_edge=True):
         super(Upwind, self).__init__(flow, arr, dim, coord=coord,
                                      spacing=spacing, order=order,
                                      fill_edge=fill_edge)
-        self.flow = flow
-        self._deriv_bwd_obj = BwdDeriv(self.arr, self.dim, coord=self.coord)
-        self._deriv_fwd_obj = FwdDeriv(self.arr, self.dim, coord=self.coord)
+        self._deriv_bwd_obj = self._DERIV_BWD_CLS(
+            self.arr, self.dim, coord=self.coord, spacing=self.spacing,
+            order=self.order, fill_edge=True
+        )
+        self._deriv_fwd_obj = self._DERIV_FWD_CLS(
+            self.arr, self.dim, coord=self.coord, spacing=self.spacing,
+            order=self.order, fill_edge=True
+        )
         self._deriv_bwd = self._deriv_bwd_obj.deriv
         self._deriv_fwd = self._deriv_fwd_obj.deriv
 
@@ -52,10 +63,8 @@ class Upwind(Advec):
         differencing is used with the same order of accuracy as in the
         interior.
         """
-        bwd = self._deriv_bwd(spacing=self.spacing, order=self.order,
-                              fill_edge=True)
-        fwd = self._deriv_fwd(spacing=self.spacing, order=self.order,
-                              fill_edge=True)
+        bwd = self._deriv_bwd()
+        fwd = self._deriv_fwd()
         # Forward diff on left edge; backward diff on right edge.
         return self._swap_bwd_fwd_edges(bwd, fwd)
 

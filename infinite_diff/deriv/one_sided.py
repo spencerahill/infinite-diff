@@ -46,7 +46,6 @@ class OneSidedDeriv(FiniteDeriv):
             double_space = self.__class__(self.arr, self.dim, coord=self.coord,
                                           spacing=2*self.spacing, order=1,
                                           fill_edge=False)._deriv()
-            print(single_space.coords)
             interior = 2*single_space - double_space
             if not self.fill_edge:
                 return interior
