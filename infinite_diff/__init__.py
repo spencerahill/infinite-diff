@@ -1,5 +1,6 @@
 """Utilities, numerical derivatives, and advection via finite differencing."""
 from ._constants import _PFULL_STR, _RADEARTH
+from . import utils
 from . import diff
 from .diff import FiniteDiff, OneSidedDiff, FwdDiff, BwdDiff, CenDiff
 from . import coord

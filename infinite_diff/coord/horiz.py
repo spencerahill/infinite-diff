@@ -1,8 +1,9 @@
-from aospy.utils import to_radians
+
 import numpy as np
 import xarray as xr
 
-from .. import _RADEARTH
+from .._constants import _RADEARTH
+from ..utils import to_radians
 from . import Coord
 
 
