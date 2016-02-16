@@ -67,8 +67,8 @@ class Lon(XCoord):
 
 class Lat(YCoord):
     """Latitude spherical horizontal coordinate."""
-    def __init__(self, lat, dim=None, cyclic=False, radius=_RADEARTH):
-        super(Lat, self).__init__(lat, dim=dim, cyclic=cyclic)
+    def __init__(self, lat, dim=None, radius=_RADEARTH):
+        super(Lat, self).__init__(lat, dim=dim, cyclic=False)
         self.radius = radius
         self._lat_rad = to_radians(lat)
 

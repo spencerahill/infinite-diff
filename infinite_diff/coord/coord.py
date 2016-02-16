@@ -4,25 +4,22 @@
 class Coord(object):
     """Generic base class for physical coordinates."""
     def _prep_dim(self, dim):
-        msg = ("Specified dim '{}' does not match any dim in self._arr.  "
-               "self._arr.dims: {}").format(dim, self._arr.dims)
-        if dim in self._arr.dims:
+        msg = ("Specified dim '{}' does not match any dim in self.arr.  "
+               "self.arr.dims: {}").format(dim, self.arr.dims)
+        if dim in self.arr.dims:
             return dim
         if dim is None:
-            if self._arr.shape == 1:
-                return self._arr.dims[0]
+            if self.arr.shape == 1:
+                return self.arr.dims[0]
         raise ValueError(msg)
 
-    def __init__(self, *args, **kwargs):
-        arr = args[0]
-        dim = kwargs.get('dim', None)
-        cyclic = kwargs.get('cyclic', False)
-        self._arr = arr
-        self._dim = self._prep_dim(dim)
-        self._cyclic = cyclic
+    def __init__(self, arr, dim=None, cyclic=False):
+        self.arr = arr
+        self.dim = self._prep_dim(dim)
+        self.cyclic = cyclic
 
     def __getitem__(self, key):
-        return self._arr[key]
+        return self.arr[key]
 
     def deriv_prefactor(self, *args, **kwargs):
         raise NotImplementedError
