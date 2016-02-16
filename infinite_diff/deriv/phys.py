@@ -164,23 +164,32 @@ class SphereEtaDeriv(object):
     _HORIZ_DERIV_CLS = SphereDeriv
     _VERT_DERIV_CLS = EtaDeriv
 
-    def __init__(self, arr, pk, bk, ps, radius=_RADEARTH):
+    def __init__(self, arr, pk, bk, ps, spacing=1, order=2, fill_edge=True,
+                 radius=_RADEARTH):
         self.arr = arr
         self.pk = pk
         self.bk = bk
         self.ps = ps
+        self.spacing = spacing
+        self.order = order
+        self.fill_edge = fill_edge
         self.radius = radius
+        deriv_kwargs = dict(spacing=spacing, order=order, fill_edge=fill_edge,
+                            radius=radius)
 
-        self._horiz_deriv_obj = self._HORIZ_DERIV_CLS(arr)
-        self._ps_horiz_deriv_obj = self._HORIZ_DERIV_CLS(ps)
+        self._horiz_deriv_obj = self._HORIZ_DERIV_CLS(arr, **deriv_kwargs)
+        self._ps_horiz_deriv_obj = self._HORIZ_DERIV_CLS(ps, **deriv_kwargs)
         for method in ['d_dx', 'd_dy', 'horiz_grad']:
             setattr(self, method, getattr(self._horiz_deriv_obj, method))
 
-        self._vert_deriv_obj = self._VERT_DERIV_CLS(arr, pk, bk, ps)
+        deriv_kwargs.pop('radius')
+        self._vert_deriv_obj = self._VERT_DERIV_CLS(arr, pk, bk, ps,
+                                                    **deriv_kwargs)
         for method in ['d_deta_from_pfull',
                        'd_deta_from_phalf',
                        'to_pfull_from_phalf']:
             setattr(self, method, getattr(self._vert_deriv_obj, method))
+        self.d_dp = self._vert_deriv_obj.deriv
 
     def _horiz_deriv_const_p(self, arr, arr_deriv, ps, ps_deriv):
         """Horizontal derivative in single direction at constant pressure."""
@@ -198,14 +207,17 @@ class SphereEtaDeriv(object):
             self._ps_horiz_deriv_obj.d_dx()
         )
 
-    def d_dy_const_p(self):
+    def d_dy_const_p(self, oper='grad'):
         return self._horiz_deriv_const_p(
-            self.arr, self.d_dy(), self.ps,
-            self._ps_horiz_deriv_obj.d_dy()
+            self.arr, self.d_dy(oper=oper), self.ps,
+            self._ps_horiz_deriv_obj.d_dy(oper=oper)
         )
 
     def horiz_grad_const_p(self):
         return self.d_dx_const_p() + self.d_dy_const_p()
+
+    def grad_3d(self):
+        return self.horiz_grad_const_p() + self.d_dp()
 
 
 class SphereEtaFwdDeriv(SphereEtaDeriv):

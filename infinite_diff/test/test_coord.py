@@ -124,6 +124,8 @@ class TestLat(LatTestCase, TestYCoord):
         desired = 1. / (self.coord_obj.radius*np.cos(self.coord_obj._lat_rad))
         actual = self.coord_obj.deriv_prefactor(oper='divg')
         self.assertDatasetIdentical(actual, desired)
+        # Invalid
+        self.assertRaises(ValueError, self.coord_obj.deriv_prefactor, 'abc')
 
     def test_deriv_factor(self):
         # Gradient
@@ -134,6 +136,8 @@ class TestLat(LatTestCase, TestYCoord):
         desired = np.cos(self.coord_obj._lat_rad)
         actual = self.coord_obj.deriv_factor(oper='divg')
         self.assertDatasetIdentical(actual, desired)
+        # Invalid
+        self.assertRaises(ValueError, self.coord_obj.deriv_factor, 'abc')
 
 
 class VertCoordTestCase(CoordTestCase):

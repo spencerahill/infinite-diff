@@ -77,9 +77,13 @@ class Lat(YCoord):
             return 1. / self.radius
         if oper == 'divg':
             return 1. / (self.radius * np.cos(self._lat_rad))
+        msg = "'oper' must be 'grad' or 'divg': value was '{}'".format(oper)
+        raise ValueError(msg)
 
     def deriv_factor(self, oper='grad'):
         if oper == 'grad':
             return 1.
         if oper == 'divg':
             return np.cos(self._lat_rad)
+        msg = "'oper' must be 'grad' or 'divg': value was '{}'".format(oper)
+        raise ValueError(msg)

@@ -196,10 +196,9 @@ class SphereEtaDerivTestCase(InfiniteDiffTestCase):
                     LON_STR: self.lon}
         )
         self.ps = xr.DataArray(
-            np.random.random((len(self.pfull), len(self.lat), len(self.lon))),
-            dims=[PFULL_STR, LAT_STR, LON_STR],
-            coords={PFULL_STR: self.pfull, LAT_STR: self.lat,
-                    LON_STR: self.lon}
+            np.random.random((len(self.lat), len(self.lon))),
+            dims=[LAT_STR, LON_STR],
+            coords={LAT_STR: self.lat, LON_STR: self.lon}
         )*1e3 + 1e5
 
         self.deriv_obj = self._DERIV_CLS(self.arr, self.pk, self.bk, self.ps)
