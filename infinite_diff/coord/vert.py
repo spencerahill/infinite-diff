@@ -14,33 +14,25 @@ def replace_coord(arr, old_dim, new_dim, new_coord):
 
 class VertCoord(Coord):
     """Base class for vertical coordinates."""
-    def __init__(self, *args, **kwargs):
-        arr = args[0]
-        dim = kwargs.get('dim', None)
+    def __init__(self, arr, dim=None):
         super(VertCoord, self).__init__(arr, dim=dim, cyclic=False)
 
 
 class ZCoord(VertCoord):
     """Height vertical coordinates."""
-    def __init__(self, *args, **kwargs):
-        z = args[0]
-        dim = kwargs.get('dim', None)
+    def __init__(self, z, dim=None):
         super(ZCoord, self).__init__(z, dim=dim)
 
 
 class Pressure(VertCoord):
     """Pressure vertical coordinates."""
-    def __init__(self, *args, **kwargs):
-        p = args[0]
-        dim = kwargs.get('dim', None)
+    def __init__(self, p, dim=None):
         super(Pressure, self).__init__(p, dim=dim)
 
 
 class Sigma(VertCoord):
     """Pressure divided by surface pressure vertical coordinates."""
-    def __init__(self, *args, **kwargs):
-        sigma = args[0]
-        dim = kwargs.get('dim', None)
+    def __init__(self, sigma, dim=None):
         super(Sigma, self).__init__(sigma, dim=dim)
 
     def pressure(self, ps):
@@ -50,12 +42,13 @@ class Sigma(VertCoord):
 
 class Eta(VertCoord):
     """Hybrid sigma-pressure vertical coordinates."""
-    def __init__(self, *args, **kwargs):
-        self.pk = args[0]
-        self.bk = args[1]
-        self.pfull = args[2]
+    def __init__(self, pk, bk, pfull, dim=None):
+        self.pk = pk
+        self.bk = bk
+        self.pfull = pfull
         self.phalf = self.pk[PHALF_STR]
-        self.dim = kwargs.get('dim', None)
+        self.arr = self.phalf
+        self.dim = dim if dim is not None else self.pk.dims[0]
 
     def phalf_from_ps(self, ps):
         """Compute pressure at level edges from surface pressure."""
@@ -86,7 +79,7 @@ class Eta(VertCoord):
         simply increment by 1 from 0 at the surface upwards.  The data to be
         differenced is assumed to be defined at full pressure levels.
         """
-        deriv = CenDiff(arr, PFULL_STR, fill_edge=True) / 2.
+        deriv = CenDiff(arr, PFULL_STR, fill_edge=True).diff() / 2.
         # Edges use 1-sided differencing, so only spanning one level, not two.
         deriv[{PFULL_STR: 0}] = deriv[{PFULL_STR: 0}] * 2.
         deriv[{PFULL_STR: -1}] = deriv[{PFULL_STR: -1}] * 2.

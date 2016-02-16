@@ -4,6 +4,7 @@ import unittest
 from aospy.utils import to_radians
 import numpy as np
 
+from infinite_diff._constants import LON_STR, LAT_STR, PHALF_STR
 from infinite_diff.coord import Coord, HorizCoord, XCoord, YCoord, Lon, Lat
 from infinite_diff.coord import VertCoord, ZCoord, Pressure, Sigma, Eta
 
@@ -13,12 +14,12 @@ from . import InfiniteDiffTestCase
 class CoordSharedTests(object):
     def test_init(self):
         self.assertIsInstance(self.coord_obj, self._COORD_CLS)
-        self.assertDatasetIdentical(self.coord_obj._arr, self.arr)
+        self.assertDatasetIdentical(self.coord_obj.arr, self.arr)
 
     def test_getitem(self):
         for key in range(len(self.arr)):
             self.assertDatasetIdentical(self.coord_obj[key],
-                                        self.coord_obj._arr[key])
+                                        self.coord_obj.arr[key])
 
     def test_deriv_prefactor(self):
         self.assertNotImplemented(self.coord_obj.deriv_prefactor)
@@ -30,11 +31,12 @@ class CoordSharedTests(object):
 class CoordTestCase(InfiniteDiffTestCase):
     _COORD_CLS = Coord
     _CYCLIC = False
+    _INIT_KWARGS = dict(cyclic=_CYCLIC)
 
     def setUp(self):
         super(CoordTestCase, self).setUp()
         self.arr = self.arange
-        self.coord_obj = Coord(self.arr, dim=self.dim, cyclic=self._CYCLIC)
+        self.coord_obj = Coord(self.arr, dim=self.dim, **self._INIT_KWARGS)
 
 
 class TestCoord(CoordTestCase, CoordSharedTests):
@@ -90,7 +92,7 @@ class LonTestCase(XCoordTestCase):
     def setUp(self):
         super(LonTestCase, self).setUp()
         self.arr = self.lon
-        self.dim = 'lon'
+        self.dim = LON_STR
         self.coord_obj = Lon(self.arr, dim=self.dim, cyclic=self._CYCLIC)
 
 
@@ -103,12 +105,13 @@ class TestLon(LonTestCase, TestXCoord):
 
 class LatTestCase(YCoordTestCase):
     _COORD_CLS = Lat
+    _INIT_KWARGS = {}
 
     def setUp(self):
         super(LatTestCase, self).setUp()
         self.arr = self.lat
-        self.dim = 'lat'
-        self.coord_obj = Lat(self.arr, dim=self.dim, cyclic=self._CYCLIC)
+        self.dim = LAT_STR
+        self.coord_obj = Lat(self.arr, dim=self.dim)
 
 
 class TestLat(LatTestCase, TestYCoord):
@@ -121,6 +124,8 @@ class TestLat(LatTestCase, TestYCoord):
         desired = 1. / (self.coord_obj.radius*np.cos(self.coord_obj._lat_rad))
         actual = self.coord_obj.deriv_prefactor(oper='divg')
         self.assertDatasetIdentical(actual, desired)
+        # Invalid
+        self.assertRaises(ValueError, self.coord_obj.deriv_prefactor, 'abc')
 
     def test_deriv_factor(self):
         # Gradient
@@ -131,6 +136,8 @@ class TestLat(LatTestCase, TestYCoord):
         desired = np.cos(self.coord_obj._lat_rad)
         actual = self.coord_obj.deriv_factor(oper='divg')
         self.assertDatasetIdentical(actual, desired)
+        # Invalid
+        self.assertRaises(ValueError, self.coord_obj.deriv_factor, 'abc')
 
 
 class VertCoordTestCase(CoordTestCase):
@@ -192,13 +199,15 @@ class EtaTestCase(VertCoordTestCase):
     def setUp(self):
         super(EtaTestCase, self).setUp()
         self.arr = self.phalf
-        self.dim = 'phalf'
-        self.coord_obj = Eta(self.arr, self.pk, self.bk, self.pfull,
-                             dim=self.dim)
+        self.dim = PHALF_STR
+        self.coord_obj = Eta(self.pk, self.bk, self.pfull, dim=self.dim)
 
 
 class TestEta(EtaTestCase, TestVertCoord):
-    pass
+    def test_init(self):
+        self.assertIsInstance(self.coord_obj, self._COORD_CLS)
+        self.assertDatasetIdentical(self.coord_obj.arr.coords.to_dataset(),
+                                    self.arr.coords.to_dataset())
 
 
 if __name__ == '__main__':

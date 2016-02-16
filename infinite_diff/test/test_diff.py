@@ -12,90 +12,99 @@ import xarray as xr
 from . import InfiniteDiffTestCase
 
 
-class TestFiniteDiff(InfiniteDiffTestCase):
-    def setUp(self):
-        super(TestFiniteDiff, self).setUp()
-        self.cls = FiniteDiff
-        self.fd_ones_trunc = [self.cls(self.ones_trunc[n], self.dim)
-                              for n in range(self.array_len)]
+class DiffSharedTests(object):
+    # def test_check_spacing(self):
+    #     self.assertRaises(ValueError, self._DIFF_CLS, self.ones, self.dim,
+    #                       **dict(spacing=0))
+    #     self.assertRaises(TypeError, self._DIFF_CLS, self.ones, self.dim,
+    #                       **dict(spacing=1.1))
 
-    def test_check_spacing(self):
-        self.assertRaises(ValueError, self.cls._check_spacing,
-                          **dict(spacing=0))
-        self.assertRaises(TypeError, self.cls._check_spacing,
-                          **dict(spacing=1.1))
-        # Test that no exception is raised for valid input.
-        [self.cls._check_spacing(spacing=n) for n in range(1, 20)]
-
-    def test_check_array_len(self):
-        for n, fd in enumerate(self.fd_ones_trunc):
-            self.assertRaises(ValueError, fd._check_arr_len,
-                              **dict(spacing=len(fd.arr[self.dim])))
-        fd_len0 = self.cls(self.ones.isel(**{self.dim: 0}), self.dim)
-        self.assertRaises(ValueError, fd_len0._check_arr_len)
+    # def test_check_array_len(self):
+    #     self.assertRaises(ValueError, self._DIFF_CLS, self.ones,
+    #                       self.dim, **dict(spacing=self.array_len))
 
     def test_slice_arr_dim(self):
         slice_ = slice(1, -2)
-        actual = self.cls(self.ones, self.dim)._slice_arr_dim(slice_, None)
-        self.assertDatasetIdentical(actual,
-                                    self.ones.isel(**{self.dim: slice_}))
+        arr = self.ones
+        actual = self._DIFF_CLS(arr, self.dim)._slice_arr_dim(slice_, arr)
+        self.assertDatasetIdentical(actual, arr[{self.dim: slice_}])
 
     def test_reverse_dim(self):
         values = np.arange(self.array_len)
-        arr = xr.DataArray(values, dims=[self.dim],
-                           coords={self.dim: values})
-        actual = self.cls(arr, self.dim)._reverse_dim()
+        arr = xr.DataArray(values, dims=[self.dim], coords={self.dim: values})
+        actual = self._DIFF_CLS(arr, self.dim)._reverse_dim(arr)
         desired = xr.DataArray(values[::-1], dims=[self.dim],
                                coords={self.dim: values[::-1]})
         self.assertDatasetIdentical(actual, desired)
 
-    def test_diff_not_implemented(self):
-        self.assertRaises(NotImplementedError,
-                          self.cls(self.random, self.dim).diff)
+    def test_diff(self):
+        self.assertNotImplemented(self.diff_obj.diff)
+        self.assertNotImplemented(self.diff_obj._diff)
+        self.assertNotImplemented(self.diff_obj.diff_rev)
+        self.assertNotImplemented(self.diff_obj._diff_rev)
 
 
-class FwdDiffTestCase(InfiniteDiffTestCase):
+class FiniteDiffTestCase(InfiniteDiffTestCase):
+    _DIFF_CLS = FiniteDiff
+
+    def setUp(self):
+        super(FiniteDiffTestCase, self).setUp()
+        self.spacing = 1
+        self.arr = self.ones
+        self.diff_obj = self._DIFF_CLS(self.arr, self.dim,
+                                       spacing=self.spacing)
+        self.fd_ones_trunc = [self._DIFF_CLS(self.ones_trunc[n], self.dim)
+                              for n in range(self.array_len)]
+
+
+class TestFiniteDiff(DiffSharedTests, FiniteDiffTestCase):
+    pass
+
+
+class FwdDiffTestCase(FiniteDiffTestCase):
+    _DIFF_CLS = FwdDiff
+    _IS_BWD = False
+
     def setUp(self):
         super(FwdDiffTestCase, self).setUp()
-        self.cls = FwdDiff
-        self.is_bwd = False
 
 
 class TestFwdDiff(FwdDiffTestCase):
     def test_diff_output_coords(self):
         for n in range(self.array_len - 1):
-            actual = self.cls(self.ones, self.dim).diff(spacing=n+1).coords
-            trunc = slice(n+1, None) if self.is_bwd else slice(0, -(n+1))
-            desired = self.ones.isel(**{self.dim: trunc}).coords
-            assert actual.to_dataset().identical(desired.to_dataset())
+            actual = self._DIFF_CLS(self.ones, self.dim,
+                                    spacing=n+1).diff().coords.to_dataset()
+            trunc = slice(n+1, None) if self._IS_BWD else slice(0, -(n+1))
+            desired = self.ones[{self.dim: trunc}].coords.to_dataset()
+            self.assertDatasetIdentical(actual, desired)
 
     def test_diff_zero_slope_varied_arr_len(self):
         for n, ones in enumerate(self.ones_trunc[:-2]):
-            actual = self.cls(ones, self.dim).diff()
+            actual = self._DIFF_CLS(ones, self.dim).diff()
             desired = self.zeros_trunc[n+1]
             self.assertDatasetIdentical(actual, desired)
 
     def test_diff_zero_slope_varied_spacing(self):
         for n, ones in enumerate(self.ones_trunc[:-1]):
-            actual = self.cls(self.ones, self.dim).diff(spacing=n+1)
+            actual = self._DIFF_CLS(self.ones, self.dim, spacing=n+1).diff()
             desired = self.zeros_trunc[n]
             self.assertDatasetIdentical(actual, desired)
 
     def test_diff_const_slope_varied_arr_len(self):
         for n, arange in enumerate(self.arange_trunc[:-2]):
-            actual = self.cls(arange, self.dim).diff()
+            actual = self._DIFF_CLS(arange, self.dim).diff()
             desired = self.ones_trunc[n+1]
             self.assertDatasetIdentical(actual, desired)
 
     def test_diff_const_slope_varied_spacing(self):
         for n, ones in enumerate(self.ones_trunc[:-1]):
-            actual = self.cls(self.arange, self.dim).diff(spacing=n+1)
+            actual = self._DIFF_CLS(self.arange, self.dim, spacing=n+1).diff()
             desired = (n+1)*ones
             self.assertDatasetIdentical(actual, desired)
 
     def _compar_to_diff(self, arr):
-        label = 'upper' if self.is_bwd else 'lower'
-        actual = self.cls(arr, self.dim).diff()
+        label = 'upper' if self._IS_BWD else 'lower'
+        actual = self._DIFF_CLS(arr, self.dim).diff()
         desired = arr.diff(self.dim, n=1, label=label)
         self.assertDatasetIdentical(actual, desired)
 
@@ -104,12 +113,12 @@ class TestFwdDiff(FwdDiffTestCase):
             self._compar_to_diff(arr)
 
 
-class TestBwdDiff(TestFwdDiff):
-    def setUp(self):
-        super(TestBwdDiff, self).setUp()
-        self.cls = BwdDiff
-        self.is_bwd = True
+class BwdDiffTestCase(FwdDiffTestCase):
+    _DIFF_CLS = BwdDiff
+    _IS_BWD = True
 
+    def setUp(self):
+        super(BwdDiffTestCase, self).setUp()
         self.zeros_trunc = [self.zeros.isel(**{self.dim: slice(n+1, None)})
                             for n in range(self.array_len)]
         self.ones_trunc = [self.ones.isel(**{self.dim: slice(n+1, None)})
@@ -120,11 +129,15 @@ class TestBwdDiff(TestFwdDiff):
                              for n in range(self.array_len)]
 
 
-class CenDiffTestCase(InfiniteDiffTestCase):
+class TestBwdDiff(TestFwdDiff, BwdDiffTestCase):
+    pass
+
+
+class CenDiffTestCase(FiniteDiffTestCase):
+    _DIFF_CLS = CenDiff
+
     def setUp(self):
         super(CenDiffTestCase, self).setUp()
-        self.cls = CenDiff
-
         self.zeros_trunc = [self.zeros.isel(**{self.dim: slice(n+1, -(n+1))})
                             for n in range(self.array_len // 2 - 1)]
         self.ones_trunc = [self.ones.isel(**{self.dim: slice(n+1, -(n+1))})
@@ -135,47 +148,48 @@ class CenDiffTestCase(InfiniteDiffTestCase):
                              for n in range(self.array_len // 2 - 1)]
 
 
-class TestCenDiff(CenDiffTestCase):
+class TestCenDiff(DiffSharedTests, CenDiffTestCase):
     def test_diff_output_coords(self):
         for n in range(self.array_len // 2 - 1):
-            actual = self.cls(self.ones, self.dim).diff(spacing=n+1).coords
+            actual = self._DIFF_CLS(self.ones, self.dim,
+                                    spacing=n+1).diff().coords
             trunc = slice(n+1, -(n+1))
             desired = self.ones.isel(**{self.dim: trunc}).coords
             assert actual.to_dataset().identical(desired.to_dataset())
 
     def test_diff_zero_slope_varied_arr_len(self):
         for n, ones in enumerate(self.ones_trunc[:-2]):
-            actual = self.cls(ones, self.dim).diff()
+            actual = self._DIFF_CLS(ones, self.dim).diff()
             desired = self.zeros_trunc[n+1]
             self.assertDatasetIdentical(actual, desired)
 
     def test_diff_zero_slope_varied_spacing(self):
         for n, ones in enumerate(self.ones_trunc[:-1]):
-            actual = self.cls(self.ones, self.dim).diff(spacing=n+1)
+            actual = self._DIFF_CLS(self.ones, self.dim, spacing=n+1).diff()
             desired = self.zeros_trunc[n]
             self.assertDatasetIdentical(actual, desired)
 
     def test_diff_const_slope_varied_arr_len(self):
         for n, arange in enumerate(self.arange_trunc[:-2]):
-            actual = self.cls(arange, self.dim).diff()
+            actual = self._DIFF_CLS(arange, self.dim).diff()
             desired = 2*self.ones_trunc[n+1]
             self.assertDatasetIdentical(actual, desired)
 
     def test_diff_const_slope_varied_spacing(self):
         for n, ones in enumerate(self.ones_trunc[:-1]):
-            actual = self.cls(self.arange, self.dim).diff(spacing=n+1)
+            actual = self._DIFF_CLS(self.arange, self.dim, spacing=n+1).diff()
             desired = 2*(n+1)*ones
             self.assertDatasetIdentical(actual, desired)
 
     def _compar_to_diff(self, arr):
-        actual = self.cls(arr, self.dim).diff()
+        actual = self._DIFF_CLS(arr, self.dim).diff()
         desired_values = (arr.isel(**{self.dim: slice(2, None)}).values -
                           arr.isel(**{self.dim: slice(None, -2)})).values
         desired = xr.DataArray(desired_values, dims=actual.dims,
                                coords=actual.coords)
         self.assertDatasetIdentical(actual, desired)
 
-    def test_diff_misc_slopes(self):
+    def test_diff(self):
         for arr in [self.ones, self.zeros, self.arange, self.random]:
             self._compar_to_diff(arr)
 

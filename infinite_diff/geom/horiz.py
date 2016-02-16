@@ -17,8 +17,8 @@ class HorizGeom(object):
     def __init__(self, x, y):
         self.x = self._prep_coord(x, self._X_COORD_CLS, self._X_DIM_NAME)
         self.y = self._prep_coord(y, self._Y_COORD_CLS, self._Y_DIM_NAME)
-        self._x_arr = self.x._arr
-        self._y_arr = self.y._arr
+        self._x_arr = self.x.arr
+        self._y_arr = self.y.arr
 
 
 class HorizCartesian(HorizGeom):

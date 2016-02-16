@@ -24,15 +24,16 @@ class PhysDerivSharedTests(object):
 
 class PhysDerivTestCase(InfiniteDiffTestCase):
     _DERIV_CLS = PhysDeriv
+    _CYCLIC = False
+    _COORD_KWARGS = dict(cyclic=_CYCLIC)
 
     def setUp(self):
         super(PhysDerivTestCase, self).setUp()
         self.dim = LAT_STR
         self.arr = xr.DataArray(np.random.random(self.lat.shape),
                                 dims=self.dim, coords={self.dim: self.lat})
-        self.cyclic = False
         self.deriv_obj = self._DERIV_CLS(self.arr, self.dim,
-                                         cyclic=self.cyclic)
+                                         **self._COORD_KWARGS)
 
 
 class TestPhysDeriv(PhysDerivSharedTests, PhysDerivTestCase):
@@ -41,15 +42,15 @@ class TestPhysDeriv(PhysDerivSharedTests, PhysDerivTestCase):
 
 class LonDerivTestCase(PhysDerivTestCase):
     _DERIV_CLS = LonDeriv
+    _CYCLIC = True
 
     def setUp(self):
         super(LonDerivTestCase, self).setUp()
         self.dim = LON_STR
         self.arr = xr.DataArray(np.random.random(self.lon.shape),
                                 dims=self.dim, coords={self.dim: self.lon})
-        self.cyclic = False
         self.deriv_obj = self._DERIV_CLS(self.arr, self.dim,
-                                         cyclic=self.cyclic)
+                                         **self._COORD_KWARGS)
 
 
 class TestLonDeriv(TestPhysDeriv, LonDerivTestCase):
@@ -62,8 +63,6 @@ class LonFwdDerivTestCase(LonDerivTestCase):
 
     def setUp(self):
         super(LonFwdDerivTestCase, self).setUp()
-        self.dim = LON_STR
-        self.cyclic = True
         self.arr = xr.DataArray(np.random.random(self.lon.shape),
                                 dims=self.dim, coords={self.dim: self.lon})
         self.arr2 = xr.DataArray(
@@ -72,7 +71,7 @@ class LonFwdDerivTestCase(LonDerivTestCase):
             coords={LON_STR: self.lon, LAT_STR: self.lat}
         )
         self.deriv_obj = self._DERIV_CLS(self.arr, self.dim,
-                                         cyclic=self.cyclic)
+                                         **self._COORD_KWARGS)
 
 
 class TestLonFwdDeriv(TestLonDeriv, LonFwdDerivTestCase):
@@ -82,7 +81,7 @@ class TestLonFwdDeriv(TestLonDeriv, LonFwdDerivTestCase):
         desired = self.deriv_obj.arr.shape
         self.assertEqual(actual, desired)
         # Array of latitudes.
-        deriv_obj = self._DERIV_CLS(self.arr2, self.dim, cyclic=self.cyclic)
+        deriv_obj = self._DERIV_CLS(self.arr2, self.dim, **self._COORD_KWARGS)
         actual = deriv_obj.deriv(self.lat).shape
         desired = self.arr2.shape
         self.assertEqual(actual, desired)
@@ -98,11 +97,11 @@ class TestLonBwdDeriv(TestLonFwdDeriv, LonBwdDerivTestCase):
 
 class LatDerivTestCase(PhysDerivTestCase):
     _DERIV_CLS = LatDeriv
+    _COORD_KWARGS = {}
 
     def setUp(self):
         super(LatDerivTestCase, self).setUp()
         self.dim = LAT_STR
-
         self.arr = xr.DataArray(np.random.random(self.lat.shape),
                                 dims=self.dim, coords={self.dim: self.lat})
         self.arr2 = xr.DataArray(
@@ -111,7 +110,7 @@ class LatDerivTestCase(PhysDerivTestCase):
             coords={LON_STR: self.lon, LAT_STR: self.lat}
         )
         self.deriv_obj = self._DERIV_CLS(self.arr, self.dim,
-                                         cyclic=self.cyclic)
+                                         **self._COORD_KWARGS)
 
 
 class TestLatDeriv(PhysDerivSharedTests, LatDerivTestCase):
@@ -121,11 +120,11 @@ class TestLatDeriv(PhysDerivSharedTests, LatDerivTestCase):
 
 class LatFwdDerivTestCase(LatDerivTestCase):
     _DERIV_CLS = LatFwdDeriv
+    _CYCLIC = False
 
     def setUp(self):
         super(LatFwdDerivTestCase, self).setUp()
         self.dim = LAT_STR
-        self.cyclic = False
         self.arr = xr.DataArray(np.random.random(self.lat.shape),
                                 dims=self.dim, coords={self.dim: self.lat})
         self.arr2 = xr.DataArray(
@@ -134,7 +133,7 @@ class LatFwdDerivTestCase(LatDerivTestCase):
             coords={LON_STR: self.lon, LAT_STR: self.lat}
         )
         self.deriv_obj = self._DERIV_CLS(self.arr, self.dim,
-                                         cyclic=self.cyclic)
+                                         **self._COORD_KWARGS)
 
 
 class TestLatFwdDeriv(TestLatDeriv, LatFwdDerivTestCase):
@@ -146,7 +145,7 @@ class TestLatFwdDeriv(TestLatDeriv, LatFwdDerivTestCase):
             self.assertEqual(actual, desired)
             # Array of latitudes.
             deriv_obj = self._DERIV_CLS(self.arr2, self.dim,
-                                        cyclic=self.cyclic)
+                                        **self._COORD_KWARGS)
             actual = deriv_obj.deriv(oper=oper).shape
             desired = self.arr2.shape
             self.assertEqual(actual, desired)
@@ -197,10 +196,9 @@ class SphereEtaDerivTestCase(InfiniteDiffTestCase):
                     LON_STR: self.lon}
         )
         self.ps = xr.DataArray(
-            np.random.random((len(self.pfull), len(self.lat), len(self.lon))),
-            dims=[PFULL_STR, LAT_STR, LON_STR],
-            coords={PFULL_STR: self.pfull, LAT_STR: self.lat,
-                    LON_STR: self.lon}
+            np.random.random((len(self.lat), len(self.lon))),
+            dims=[LAT_STR, LON_STR],
+            coords={LAT_STR: self.lat, LON_STR: self.lon}
         )*1e3 + 1e5
 
         self.deriv_obj = self._DERIV_CLS(self.arr, self.pk, self.bk, self.ps)
@@ -223,6 +221,12 @@ class TestSphereEtaFwdDeriv(TestSphereEtaDeriv, SphereEtaFwdDerivTestCase):
     def test_deriv(self):
         self.deriv_obj.d_dx()
         self.deriv_obj.d_dy()
+        self.deriv_obj.horiz_grad()
+
+    def test_deriv_const_p(self):
+        self.deriv_obj.d_dx_const_p()
+        self.deriv_obj.d_dy_const_p()
+        self.deriv_obj.horiz_grad_const_p()
 
 
 class SphereEtaBwdDerivTestCase(SphereEtaDerivTestCase):

@@ -6,29 +6,31 @@ from . import FiniteDiff, BwdDiff, FwdDiff
 
 class CenDiff(FiniteDiff):
     """Centered finite differencing."""
+    _MIN_SPACING_FACTOR = 2
     _DIFF_BWD_CLS = BwdDiff
     _DIFF_FWD_CLS = FwdDiff
 
-    def __init__(self, arr, dim):
-        super(CenDiff, self).__init__(arr, dim)
-        self._diff_bwd = self._DIFF_BWD_CLS(arr, dim).diff
-        self._diff_fwd = self._DIFF_FWD_CLS(arr, dim).diff
+    def __init__(self, arr, dim, spacing=1, fill_edge=False):
+        super(CenDiff, self).__init__(arr, dim, spacing=spacing)
+        self.fill_edge = fill_edge
+        self._diff_bwd = self._DIFF_BWD_CLS(arr, dim, spacing=spacing).diff
+        self._diff_fwd = self._DIFF_FWD_CLS(arr, dim, spacing=spacing).diff
 
-    def _diff_edge(self, spacing=1, side='left'):
+    def _diff_edge(self, side='left'):
         """One-sided differencing of array edge."""
         if side == 'left':
-            trunc = slice(0, spacing+1)
-            method = self._diff_fwd
+            trunc = slice(0, self.spacing + 1)
+            cls = self._DIFF_FWD_CLS
         elif side == 'right':
-            trunc = slice(-(spacing+1), None)
-            method = self._diff_bwd
+            trunc = slice(-(self.spacing + 1), None)
+            cls = self._DIFF_BWD_CLS
         else:
             raise ValueError("Parameter `side` must be either 'left' "
                              "or 'right': {}").format(side)
-        arr_edge = self._slice_arr_dim(trunc)
-        return method(arr=arr_edge)
+        arr_edge = self._slice_arr_dim(trunc, self.arr)
+        return cls(arr_edge, self.dim, spacing=self.spacing).diff()
 
-    def diff(self, spacing=1, fill_edge=False):
+    def diff(self):
         """Centered differencing of the DataArray or Dataset.
 
         :param fill_edge: Whether or not to fill in the edge cells
@@ -41,18 +43,15 @@ class CenDiff(FiniteDiff):
             If `False`, the outputted array has a length in the computed axis
             reduced by `order`.
         """
-        self._check_spacing(spacing)
-        self._check_arr_len(spacing=2*spacing, pad=1)
+        left = self._slice_arr_dim(slice(0, -self.spacing), self.arr)
+        right = self._slice_arr_dim(slice(self.spacing, None), self.arr)
+        interior = (self._DIFF_FWD_CLS(right, self.dim, self.spacing).diff() +
+                    self._DIFF_BWD_CLS(left, self.dim, self.spacing).diff())
 
-        left = self._slice_arr_dim(slice(0, -spacing))
-        right = self._slice_arr_dim(slice(spacing, None))
-        interior = (self._DIFF_FWD_CLS(right, self.dim).diff(spacing=spacing) +
-                    self._DIFF_BWD_CLS(left, self.dim).diff(spacing=spacing))
-
-        if fill_edge in ('left', 'both'):
+        if self.fill_edge in ('left', 'both'):
             diff_left = self._diff_edge(side='left')
             interior = xr.concat([diff_left, interior], dim=self.dim)
-        if fill_edge == ('right', 'both'):
+        if self.fill_edge == ('right', 'both'):
             diff_right = self._diff_edge(side='right')
             interior = xr.concat([interior, diff_right], dim=self.dim)
         return interior

@@ -3,7 +3,30 @@
 
 class FiniteDiff(object):
     """Base class for finite differencing of xarray objects."""
-    def __init__(self, arr, dim):
+    _MIN_SPACING_FACTOR = 1
+
+    # def _check_arr_len(self):
+    #     """Ensure array is long enough to perform the differencing."""
+    #     try:
+    #         len_arr_dim = len(self.arr[self.dim])
+    #     except TypeError:
+    #         len_arr_dim = 0
+    #     print(self.arr[self.dim])
+    #     msg = ("Array along dim '{}' is too small (={}) for differencing "
+    #            "with spacing {}".format(self.dim, len_arr_dim, self.spacing))
+    #     if len_arr_dim < self.spacing*self._MIN_SPACING_FACTOR + 1:
+    #         raise ValueError(msg)
+
+    # def _check_spacing(self):
+    #     """Ensure spacing value is valid."""
+    #     msg = ("'spacing' value of {} invalid; spacing must be positive "
+    #            "integer".format(self.spacing))
+    #     if not isinstance(self.spacing, int):
+    #         raise TypeError(msg)
+    #     if self.spacing < 1:
+    #         raise ValueError(msg)
+
+    def __init__(self, arr, dim, spacing=1):
         """
         Create a `FiniteDiff` object.
 
@@ -15,52 +38,26 @@ class FiniteDiff(object):
         """
         self.arr = arr
         self.dim = dim
+        self.spacing = spacing
+        # self._check_spacing()
+        # self._check_arr_len()
 
-    @staticmethod
-    def _check_spacing(spacing, min_spacing=1):
-        """Ensure spacing value is valid."""
-        msg = ("'spacing' value of {} invalid; spacing must be positive "
-               "integer".format(spacing))
-        if not isinstance(spacing, int):
-            raise TypeError(msg)
-        if spacing < min_spacing:
-            raise ValueError(msg)
-
-    def _find_arr(self, arr):
-        if arr is None:
-            return self.arr
-        return arr
-
-    def _check_arr_len(self, arr=None, spacing=1, pad=1):
-        """Ensure array is long enough to perform the differencing."""
-        arr = self._find_arr(arr)
-        try:
-            len_arr_dim = len(arr[self.dim])
-        except TypeError:
-            len_arr_dim = 0
-        if len_arr_dim < spacing + pad:
-            msg = ("Array along dim '{}' is too small (={}) for differencing "
-                   "with spacing {}".format(self.dim, len_arr_dim, spacing))
-            raise ValueError(msg)
-
-    def _slice_arr_dim(self, slice_, arr=None):
+    def _slice_arr_dim(self, slice_, arr):
         """Get a slice of a DataArray along a particular dim."""
-        arr = self._find_arr(arr)
-        return arr.isel(**{self.dim: slice_})
+        return arr[{self.dim: slice_}]
 
-    def _reverse_dim(self, arr=None):
+    def _reverse_dim(self, arr):
         """Reverse the DataArray along the given dimension."""
-        arr = self._find_arr(arr)
-        return self._slice_arr_dim(slice(-1, None, -1), arr=arr)
+        return self._slice_arr_dim(slice(-1, None, -1), arr)
 
-    def _diff(self, arr=None, spacing=1):
+    def _diff(self):
         raise NotImplementedError
 
-    def _diff_rev(self, arr=None, spacing=1):
+    def _diff_rev(self):
         raise NotImplementedError
 
-    def diff(self, arr=None, spacing=1):
+    def diff(self):
         raise NotImplementedError
 
-    def diff_rev(self, arr=None, spacing=1):
+    def diff_rev(self):
         raise NotImplementedError
