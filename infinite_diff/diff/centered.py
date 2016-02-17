@@ -12,6 +12,7 @@ class CenDiff(FiniteDiff):
 
     def __init__(self, arr, dim, spacing=1, fill_edge=False):
         super(CenDiff, self).__init__(arr, dim, spacing=spacing)
+        assert fill_edge in (False, 'left', 'right', 'both', True), fill_edge
         self.fill_edge = fill_edge
         self._diff_bwd = self._DIFF_BWD_CLS(arr, dim, spacing=spacing).diff
         self._diff_fwd = self._DIFF_FWD_CLS(arr, dim, spacing=spacing).diff
@@ -48,10 +49,10 @@ class CenDiff(FiniteDiff):
         interior = (self._DIFF_FWD_CLS(right, self.dim, self.spacing).diff() +
                     self._DIFF_BWD_CLS(left, self.dim, self.spacing).diff())
 
-        if self.fill_edge in ('left', 'both'):
+        if self.fill_edge in ('left', 'both', True):
             diff_left = self._diff_edge(side='left')
             interior = xr.concat([diff_left, interior], dim=self.dim)
-        if self.fill_edge == ('right', 'both'):
+        if self.fill_edge in ('right', 'both', True):
             diff_right = self._diff_edge(side='right')
             interior = xr.concat([interior, diff_right], dim=self.dim)
         return interior

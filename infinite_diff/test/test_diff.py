@@ -13,16 +13,6 @@ from . import InfiniteDiffTestCase
 
 
 class DiffSharedTests(object):
-    # def test_check_spacing(self):
-    #     self.assertRaises(ValueError, self._DIFF_CLS, self.ones, self.dim,
-    #                       **dict(spacing=0))
-    #     self.assertRaises(TypeError, self._DIFF_CLS, self.ones, self.dim,
-    #                       **dict(spacing=1.1))
-
-    # def test_check_array_len(self):
-    #     self.assertRaises(ValueError, self._DIFF_CLS, self.ones,
-    #                       self.dim, **dict(spacing=self.array_len))
-
     def test_slice_arr_dim(self):
         slice_ = slice(1, -2)
         arr = self.ones
@@ -73,10 +63,10 @@ class TestFwdDiff(FwdDiffTestCase):
     def test_diff_output_coords(self):
         for n in range(self.array_len - 1):
             actual = self._DIFF_CLS(self.ones, self.dim,
-                                    spacing=n+1).diff().coords.to_dataset()
+                                    spacing=n+1).diff()
             trunc = slice(n+1, None) if self._IS_BWD else slice(0, -(n+1))
-            desired = self.ones[{self.dim: trunc}].coords.to_dataset()
-            self.assertDatasetIdentical(actual, desired)
+            desired = self.ones[{self.dim: trunc}]
+            self.assertCoordsIdentical(actual, desired)
 
     def test_diff_zero_slope_varied_arr_len(self):
         for n, ones in enumerate(self.ones_trunc[:-2]):
@@ -152,10 +142,10 @@ class TestCenDiff(DiffSharedTests, CenDiffTestCase):
     def test_diff_output_coords(self):
         for n in range(self.array_len // 2 - 1):
             actual = self._DIFF_CLS(self.ones, self.dim,
-                                    spacing=n+1).diff().coords
+                                    spacing=n+1).diff()
             trunc = slice(n+1, -(n+1))
-            desired = self.ones.isel(**{self.dim: trunc}).coords
-            assert actual.to_dataset().identical(desired.to_dataset())
+            desired = self.ones[{self.dim: trunc}]
+            self.assertCoordsIdentical(actual, desired)
 
     def test_diff_zero_slope_varied_arr_len(self):
         for n, ones in enumerate(self.ones_trunc[:-2]):
@@ -180,6 +170,16 @@ class TestCenDiff(DiffSharedTests, CenDiffTestCase):
             actual = self._DIFF_CLS(self.arange, self.dim, spacing=n+1).diff()
             desired = 2*(n+1)*ones
             self.assertDatasetIdentical(actual, desired)
+
+    def test_diff_fill_edge(self):
+        fills = [False, 'left', 'right', 'both', True]
+        truncs = [slice(1, -1), slice(0, -1), slice(1, None),
+                  slice(None, None), slice(None, None)]
+        for fill, trunc in zip(fills, truncs):
+            actual = self._DIFF_CLS(self.arange, self.dim, spacing=1,
+                                    fill_edge=fill).diff()
+            desired = self.arange[{self.dim: trunc}]
+            self.assertCoordsIdentical(actual, desired)
 
     def _compar_to_diff(self, arr):
         actual = self._DIFF_CLS(arr, self.dim).diff()
