@@ -1,23 +1,9 @@
 
 import numpy as np
-import xarray as xr
 
 from .._constants import _RADEARTH
 from ..utils import to_radians
 from . import Coord
-
-
-def wraparound(arr, dim, left=1, right=1, circumf=360., spacing=1):
-    """Append wrap-around point(s) to the DataArray or Dataset coord."""
-    if left:
-        edge_left = arr.isel(**{dim: slice(0, left, spacing)})
-        edge_left[dim] += circumf
-        arr = xr.concat([arr, edge_left], dim=dim)
-    if right:
-        edge_right = arr.isel(**{dim: slice(-right, None, spacing)})
-        edge_right[dim] -= circumf
-        xr.concat([edge_right, arr], dim=dim)
-    return arr
 
 
 class HorizCoord(Coord):
@@ -68,6 +54,8 @@ class Lon(XCoord):
 
 class Lat(YCoord):
     """Latitude spherical horizontal coordinate."""
+    _POSSIBLY_CYCLIC = False
+
     def __init__(self, lat, dim=None, radius=_RADEARTH):
         super(Lat, self).__init__(lat, dim=dim, cyclic=False)
         self.radius = radius
