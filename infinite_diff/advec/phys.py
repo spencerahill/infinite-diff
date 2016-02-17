@@ -13,14 +13,23 @@ class PhysUpwind(Upwind):
     _ADVEC_CLS = Upwind
 
     def __init__(self, flow, arr, dim, coord=None, spacing=1, order=2,
-                 fill_edge=True, cyclic=False):
+                 cyclic=False, fill_edge=True):
+        self.flow = flow
+        self.arr = arr
+        self.dim = dim
+        self.coord = coord
+        self.spacing = spacing
+        self.order = order
+        self.cyclic = cyclic
+        self.fill_edge = fill_edge
+
         self._deriv_bwd_obj = self._DERIV_BWD_CLS(
             arr, dim, coord=coord, spacing=spacing, order=order,
-            fill_edge=fill_edge, cyclic=cyclic
+            cyclic=cyclic, fill_edge=fill_edge,
         )
         self._deriv_fwd_obj = self._DERIV_FWD_CLS(
             arr, dim, coord=coord, spacing=spacing, order=order,
-            fill_edge=fill_edge, cyclic=cyclic
+            cyclic=cyclic, fill_edge=fill_edge
         )
         self._deriv_bwd = getattr(self._deriv_bwd_obj, self._DERIV_METHOD)
         self._deriv_fwd = getattr(self._deriv_fwd_obj, self._DERIV_METHOD)
@@ -52,7 +61,7 @@ class PhysUpwind(Upwind):
         bwd, fwd = self._derivs_bwd_fwd(*args, **kwargs)
         neg, pos = self._flow_neg_pos()
         advec_arr = pos*bwd + neg*fwd
-        if not self.fill_edge:
+        if not self.fill_edge and not self.cyclic:
             slice_middle = {self.dim: slice(self.order, -self.order)}
             advec_arr = advec_arr[slice_middle]
         return advec_arr
@@ -65,11 +74,12 @@ class LonUpwind(PhysUpwind):
     _DIM = LON_STR
 
     def __init__(self, flow, arr, dim=None, coord=None, spacing=1, order=2,
-                 fill_edge=True, cyclic=True):
+                 cyclic=True, fill_edge=False):
         self.flow = flow
         self.arr = arr
         self.spacing = spacing
         self.order = order
+        self.cyclic = cyclic
         self.fill_edge = fill_edge
 
         self.dim = dim if dim is not None else self._DIM
@@ -77,11 +87,11 @@ class LonUpwind(PhysUpwind):
 
         self._deriv_bwd_obj = self._DERIV_BWD_CLS(
             arr, dim, coord=coord, spacing=spacing, order=order,
-            fill_edge=fill_edge, cyclic=cyclic
+            fill_edge=True, cyclic=cyclic
         )
         self._deriv_fwd_obj = self._DERIV_FWD_CLS(
             arr, dim, coord=coord, spacing=spacing, order=order,
-            fill_edge=fill_edge, cyclic=cyclic
+            fill_edge=True, cyclic=cyclic
         )
         self._deriv_bwd = self._deriv_bwd_obj.deriv
         self._deriv_fwd = self._deriv_fwd_obj.deriv
@@ -106,11 +116,11 @@ class LatUpwind(PhysUpwind):
 
         self._deriv_bwd_obj = self._DERIV_BWD_CLS(
             arr, dim, coord=coord, spacing=spacing, order=order,
-            fill_edge=fill_edge
+            fill_edge=True
         )
         self._deriv_fwd_obj = self._DERIV_FWD_CLS(
             arr, dim, coord=coord, spacing=spacing, order=order,
-            fill_edge=fill_edge
+            fill_edge=True
         )
         self._deriv_bwd = self._deriv_bwd_obj.deriv
         self._deriv_fwd = self._deriv_fwd_obj.deriv
@@ -137,27 +147,78 @@ class EtaUpwind(PhysUpwind):
         self.coord = coord if coord is not None else self.arr[self._DIM]
 
         self._deriv_bwd_obj = self._DERIV_BWD_CLS(
-            arr, pk, bk, ps, spacing=spacing, order=order, fill_edge=fill_edge
+            arr, pk, bk, ps, spacing=spacing, order=order, fill_edge=True
         )
         self._deriv_fwd_obj = self._DERIV_FWD_CLS(
-            arr, pk, bk, ps, spacing=spacing, order=order, fill_edge=fill_edge
+            arr, pk, bk, ps, spacing=spacing, order=order, fill_edge=True
         )
         self._deriv_bwd = getattr(self._deriv_bwd_obj, self._DERIV_METHOD)
         self._deriv_fwd = getattr(self._deriv_fwd_obj, self._DERIV_METHOD)
 
 
-class LonUpwindConstP(EtaUpwind):
+class LonUpwindConstP(PhysUpwind):
     """Upwind advection along a physical coordinate."""
     _DERIV_BWD_CLS = SphereEtaBwdDeriv
     _DERIV_FWD_CLS = SphereEtaFwdDeriv
+    _DIM = LON_STR
     _DERIV_METHOD = 'd_dx_const_p'
 
+    def __init__(self, flow, arr, pk, bk, ps, dim=None, coord=None, spacing=1,
+                 order=2, cyclic=True, fill_edge=False):
+        self.flow = flow
+        self.arr = arr
+        self.pk = pk
+        self.bk = bk
+        self.ps = ps
+        self.spacing = spacing
+        self.order = order
+        self.cyclic = cyclic
+        self.fill_edge = fill_edge
 
-class LatUpwindConstP(EtaUpwind):
+        self.dim = dim if dim is not None else self._DIM
+        self.coord = coord if coord is not None else self.arr[self._DIM]
+
+        deriv_args = [self.arr, self.pk, self.bk, self.ps]
+        deriv_kwargs = dict(spacing=spacing, order=order, cyclic_lon=cyclic,
+                            fill_edge_lon=fill_edge)
+
+        self._deriv_bwd_obj = self._DERIV_BWD_CLS(*deriv_args, **deriv_kwargs)
+        self._deriv_fwd_obj = self._DERIV_FWD_CLS(*deriv_args, **deriv_kwargs)
+        self._deriv_bwd = getattr(self._deriv_bwd_obj, self._DERIV_METHOD)
+        self._deriv_fwd = getattr(self._deriv_fwd_obj, self._DERIV_METHOD)
+
+
+class LatUpwindConstP(PhysUpwind):
     """Upwind advection along a physical coordinate."""
     _DERIV_BWD_CLS = SphereEtaBwdDeriv
     _DERIV_FWD_CLS = SphereEtaFwdDeriv
+    _DIM = LAT_STR
     _DERIV_METHOD = 'd_dy_const_p'
+
+    def __init__(self, flow, arr, pk, bk, ps, dim=None, coord=None, spacing=1,
+                 order=2, fill_edge=True):
+        self.flow = flow
+        self.arr = arr
+        self.pk = pk
+        self.bk = bk
+        self.ps = ps
+        self.spacing = spacing
+        self.order = order
+        self.fill_edge = fill_edge
+
+        self.dim = dim if dim is not None else self._DIM
+        self.coord = coord if coord is not None else self.arr[self._DIM]
+
+        self._deriv_bwd_obj = self._DERIV_BWD_CLS(
+            arr, pk, bk, ps, spacing=spacing, order=order,
+            fill_edge_lat=fill_edge
+        )
+        self._deriv_fwd_obj = self._DERIV_FWD_CLS(
+            arr, pk, bk, ps, spacing=spacing, order=order,
+            fill_edge_lat=fill_edge
+        )
+        self._deriv_bwd = getattr(self._deriv_bwd_obj, self._DERIV_METHOD)
+        self._deriv_fwd = getattr(self._deriv_fwd_obj, self._DERIV_METHOD)
 
 
 class SphereEtaUpwind(object):
@@ -165,7 +226,9 @@ class SphereEtaUpwind(object):
     _Y_ADVEC_CLS = LatUpwindConstP
     _Z_ADVEC_CLS = EtaUpwind
 
-    def __init__(self, arr, pk, bk, ps, spacing=1, order=2, fill_edge=True):
+    def __init__(self, arr, pk, bk, ps, spacing=1, order=2,
+                 cyclic_lon=True, fill_edge_lon=False, fill_edge_lat=True,
+                 fill_edge_vert=True):
         self.arr = arr
         self.lat = arr[LAT_STR]
         self.pk = pk
@@ -173,25 +236,34 @@ class SphereEtaUpwind(object):
         self.ps = ps
         self.spacing = spacing
         self.order = order
-        self.fill_edge = fill_edge
+        self.cyclic_lon = cyclic_lon
+        self.fill_edge_lon = fill_edge_lon
+        self.fill_edge_lat = fill_edge_lat
+        self.fill_edge_vert = fill_edge_vert
         self._advec_args = [self.arr, self.pk, self.bk, self.ps]
-        self._advec_kwargs = dict(spacing=spacing, order=order,
-                                  fill_edge=fill_edge)
+        advec_kwargs = dict(spacing=spacing, order=order,
+                            fill_edge=fill_edge_lon, cyclic=cyclic_lon)
+        self._advec_x_kwargs = advec_kwargs
+        advec_kwargs.pop('cyclic')
+        advec_kwargs.update(dict(fill_edge=fill_edge_lat))
+        self._advec_y_kwargs = advec_kwargs
+        advec_kwargs.update(dict(fill_edge=fill_edge_vert))
+        self._advec_z_kwargs = advec_kwargs
 
     def advec_x_const_p(self, u):
         return self._X_ADVEC_CLS(u, *self._advec_args,
-                                 **self._advec_kwargs).advec()
+                                 **self._advec_x_kwargs).advec()
 
     def advec_y_const_p(self, v):
         return self._Y_ADVEC_CLS(v, *self._advec_args,
-                                 **self._advec_kwargs).advec(oper='grad')
+                                 **self._advec_y_kwargs).advec(oper='grad')
 
     def advec_horiz_const_p(self, u, v):
         return self.advec_x_const_p(u) + self.advec_y_const_p(v)
 
     def advec_z(self, omega):
         return self._Z_ADVEC_CLS(omega, *self._advec_args,
-                                 **self._advec_kwargs).advec()
+                                 **self._advec_z_kwargs).advec()
 
     advec_p = advec_z
 
