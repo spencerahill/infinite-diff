@@ -107,21 +107,21 @@ class TestFwdDeriv(TestOneSidedDeriv, FwdDerivTestCase):
         self.deriv_obj.deriv()
 
     def test_deriv_output_coords_fill(self):
-        desired = self.random.coords.to_dataset()
+        desired = self.random
         for o in [1, 2]:
             deriv_obj = self._DERIV_CLS(self.random, self.dim, order=o,
                                         fill_edge=True)
-            actual = deriv_obj.deriv().coords.to_dataset()
-            self.assertDatasetIdentical(actual, desired)
+            actual = deriv_obj.deriv()
+            self.assertCoordsIdentical(actual, desired)
 
     def test_deriv_output_coords_no_fill(self):
         for o in [1, 2]:
             trunc = slice(o, None) if self.is_bwd else slice(0, -o)
-            desired = self.random.coords.to_dataset().isel(**{self.dim: trunc})
+            desired = self.random[{self.dim: trunc}]
             deriv_obj = self._DERIV_CLS(self.random, self.dim, order=o,
                                         fill_edge=False)
-            actual = deriv_obj.deriv().coords.to_dataset()
-            self.assertDatasetIdentical(actual, desired)
+            actual = deriv_obj.deriv()
+            self.assertCoordsIdentical(actual, desired)
 
     def test_deriv_constant_slope_order1_no_fill(self):
         actual = self._DERIV_CLS(self.arange, self.dim,
@@ -292,17 +292,17 @@ class TestCenDeriv(TestFiniteDeriv, CenDerivTestCase):
     def test_output_coords_no_fill(self):
         for o in [1, 2]:
             trunc = slice(o, -o)
-            desired = self.random.coords.to_dataset()[{self.dim: trunc}]
+            desired = self.random[{self.dim: trunc}]
             actual = self._DERIV_CLS(self.random, self.dim, fill_edge=False,
-                                     order=2*o).deriv().coords.to_dataset()
-            self.assertDatasetIdentical(actual, desired)
+                                     order=2*o).deriv()
+            self.assertCoordsIdentical(actual, desired)
 
     def test_output_coords_fill(self):
-        desired = self.random.coords.to_dataset()
+        desired = self.random
         for o in [2, 4]:
             actual = self._DERIV_CLS(self.random, self.dim, fill_edge=True,
-                                     order=o).deriv().coords.to_dataset()
-            self.assertDatasetIdentical(actual, desired)
+                                     order=o).deriv()
+            self.assertCoordsIdentical(actual, desired)
 
     def test_deriv_constant_slope_order2_no_fill(self):
         actual = self._DERIV_CLS(self.arange, self.dim, order=2,

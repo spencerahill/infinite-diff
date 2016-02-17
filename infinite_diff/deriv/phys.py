@@ -1,4 +1,7 @@
+import warnings
+
 from .._constants import LON_STR, LAT_STR, PFULL_STR, _RADEARTH
+from ..utils import to_radians, wraparound
 from ..coord import Coord, Lon, Lat, Eta
 from . import FiniteDeriv, FwdDeriv, BwdDeriv, CenDeriv
 
@@ -7,48 +10,88 @@ class PhysDeriv(object):
     """Derivatives in physical space."""
     _COORD_CLS = Coord
     _DERIV_CLS = FiniteDeriv
+    _WRAP_CIRCUMF = 0
+    _WRAP_LEFT_TO_RIGHT = 0
+    _WRAP_RIGHT_TO_LEFT = 0
+
+    def _get_coord(self, coord):
+        if coord is None:
+            return self.arr[self.dim].copy()
+        return coord
 
     def __init__(self, arr, dim, coord=None, spacing=1, order=2,
                  fill_edge=True, **coord_kwargs):
         self.arr = arr
         self.dim = dim
-        if coord is None:
-            self.coord = arr[self.dim]
+        self.coord = self._get_coord(coord)
         self.spacing = spacing
         self.order = order
-        self.fill_edge = fill_edge
+        self.cyclic = coord_kwargs.get('cyclic', False)
+
         self._coord_obj = self._COORD_CLS(self.coord, dim=self.dim,
                                           **coord_kwargs)
-        for method in ['deriv_factor', 'deriv_prefactor']:
-            setattr(self, method, getattr(self._coord_obj, method))
+        for attr in ['deriv_factor', 'deriv_prefactor']:
+            setattr(self, attr, getattr(self._coord_obj, attr))
+
+        if fill_edge and self.cyclic:
+            warnings.warn("Overriding 'fill_edge' value of True, because "
+                          "coord is cyclic")
+        self.fill_edge = False if self.cyclic else fill_edge
+
+    def _wrap(self, arr):
+        if self.cyclic:
+            return wraparound(
+                arr, self.dim,
+                left_to_right=self._WRAP_LEFT_TO_RIGHT*self.order,
+                right_to_left=self._WRAP_RIGHT_TO_LEFT*self.order,
+                circumf=self._WRAP_CIRCUMF, spacing=self.spacing
+            )
+        return self.arr
+
+    def _prep_coord(self):
+        return self._wrap(self.coord)
 
     def deriv(self, *args, **kwargs):
         """Derivative, incorporating physical/geometrical factors."""
-        return (self._coord_obj.deriv_prefactor(*args, **kwargs) *
-                self._DERIV_CLS(self.arr*self.deriv_factor(*args, **kwargs),
-                                self.dim, coord=self.coord,
+        arr = self._wrap(self.arr)*self.deriv_factor(*args, **kwargs)
+        coord = self._prep_coord()
+        darr = (self._coord_obj.deriv_prefactor(*args, **kwargs) *
+                self._DERIV_CLS(arr, self.dim, coord=coord,
                                 spacing=self.spacing, order=self.order,
                                 fill_edge=self.fill_edge).deriv())
+        darr[self.dim] = self.coord
+        return darr
 
 
 class LonDeriv(PhysDeriv):
     _COORD_CLS = Lon
+    _WRAP_CIRCUMF = 360.
+
+    def _prep_coord(self):
+        return self._wrap(to_radians(self.coord))
 
 
 class LonFwdDeriv(LonDeriv):
     _DERIV_CLS = FwdDeriv
+    _WRAP_LEFT_TO_RIGHT = 1
 
 
 class LonBwdDeriv(LonDeriv):
     _DERIV_CLS = BwdDeriv
+    _WRAP_RIGHT_TO_LEFT = 1
 
 
 class LonCenDeriv(LonDeriv):
     _DERIV_CLS = CenDeriv
+    _WRAP_LEFT_TO_RIGHT = 1
+    _WRAP_RIGHT_TO_LEFT = 1
 
 
 class LatDeriv(PhysDeriv):
     _COORD_CLS = Lat
+
+    def _prep_coord(self):
+        return self._wrap(to_radians(self.coord))
 
 
 class LatFwdDeriv(LatDeriv):
@@ -133,12 +176,18 @@ class SphereDeriv(HorizPhysDeriv):
     _X_DERIV_CLS = LonDeriv
     _Y_DERIV_CLS = LatDeriv
 
-    def __init__(self, arr, x_coord=None, y_coord=None, **kwargs):
+    def __init__(self, arr, x_coord=None, y_coord=None, cyclic_lon=True,
+                 fill_edge_lon=False, fill_edge_lat=True, **kwargs):
         self.arr = arr
-        self._x_deriv_obj = self._X_DERIV_CLS(arr, LON_STR, coord=x_coord,
-                                              **kwargs)
-        self._y_deriv_obj = self._Y_DERIV_CLS(arr, LAT_STR, coord=y_coord,
-                                              **kwargs)
+        self.cyclic_lon = cyclic_lon
+        self._x_deriv_obj = self._X_DERIV_CLS(
+            arr, LON_STR, coord=x_coord, cyclic=cyclic_lon,
+            fill_edge=fill_edge_lon, **kwargs
+        )
+        self._y_deriv_obj = self._Y_DERIV_CLS(
+            arr, LAT_STR, coord=y_coord, fill_edge=fill_edge_lat, **kwargs
+        )
+        self.d_dy = self._y_deriv_obj.deriv
 
     def d_dx(self):
         return self._x_deriv_obj.deriv(self.arr[LAT_STR])
@@ -164,7 +213,8 @@ class SphereEtaDeriv(object):
     _HORIZ_DERIV_CLS = SphereDeriv
     _VERT_DERIV_CLS = EtaDeriv
 
-    def __init__(self, arr, pk, bk, ps, spacing=1, order=2, fill_edge=True,
+    def __init__(self, arr, pk, bk, ps, spacing=1, order=2, cyclic_lon=True,
+                 fill_edge_lon=False, fill_edge_lat=True, fill_edge_vert=True,
                  radius=_RADEARTH):
         self.arr = arr
         self.pk = pk
@@ -172,19 +222,28 @@ class SphereEtaDeriv(object):
         self.ps = ps
         self.spacing = spacing
         self.order = order
-        self.fill_edge = fill_edge
+        self.cyclic_lon = cyclic_lon
+        self.fill_edge_lon = fill_edge_lon
+        self.fill_edge_lat = fill_edge_lat
+        self.fill_edge_vert = fill_edge_vert
         self.radius = radius
-        deriv_kwargs = dict(spacing=spacing, order=order, fill_edge=fill_edge,
-                            radius=radius)
 
-        self._horiz_deriv_obj = self._HORIZ_DERIV_CLS(arr, **deriv_kwargs)
-        self._ps_horiz_deriv_obj = self._HORIZ_DERIV_CLS(ps, **deriv_kwargs)
+        horiz_deriv_kwargs = dict(
+            spacing=spacing, order=order, cyclic_lon=cyclic_lon,
+            fill_edge_lon=fill_edge_lon, fill_edge_lat=fill_edge_lat,
+            radius=radius
+        )
+        self._horiz_deriv_obj = self._HORIZ_DERIV_CLS(arr,
+                                                      **horiz_deriv_kwargs)
+        self._ps_horiz_deriv_obj = self._HORIZ_DERIV_CLS(ps,
+                                                         **horiz_deriv_kwargs)
         for method in ['d_dx', 'd_dy', 'horiz_grad']:
             setattr(self, method, getattr(self._horiz_deriv_obj, method))
 
-        deriv_kwargs.pop('radius')
+        vert_deriv_kwargs = dict(spacing=spacing, order=order,
+                                 fill_edge=fill_edge_vert)
         self._vert_deriv_obj = self._VERT_DERIV_CLS(arr, pk, bk, ps,
-                                                    **deriv_kwargs)
+                                                    **vert_deriv_kwargs)
         for method in ['d_deta_from_pfull',
                        'd_deta_from_phalf',
                        'to_pfull_from_phalf']:
@@ -197,7 +256,6 @@ class SphereEtaDeriv(object):
         bk_at_pfull = self.to_pfull_from_phalf(self.bk)
         da_deta = self.d_deta_from_phalf(self.pk)
         db_deta = self.d_deta_from_phalf(self.bk)
-
         return arr_deriv + (darr_deta * bk_at_pfull * ps_deriv /
                             (da_deta + db_deta*ps))
 

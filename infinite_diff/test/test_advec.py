@@ -108,41 +108,50 @@ class TestUpwind(UpwindTestCase):
         fill_edges = [False, True]
         for args in itertools.product([self.zeros], arrs, dims, coords,
                                       spacings, orders, fill_edges):
-            self.assertTrue(not np.any(self._ADVEC_CLS(*args).advec()))
+            self.assertAllZeros(self._ADVEC_CLS(*args).advec())
 
-    def test_pos_flow(self):
+    def test_advec_pos_flow_fill(self):
         flow = np.abs(self.random)
-        # Do fill edge.
-        desired = flow * BwdDeriv(self.arr, self.dim, order=1,
-                                  fill_edge=True).deriv()
-        actual = self._ADVEC_CLS(flow, self.arr, self.dim, order=1,
-                                 fill_edge=True).advec()
-        self.assertDatasetIdentical(actual, desired)
+        for o in [1, 2]:
+            desired = flow * BwdDeriv(self.arr, self.dim, order=o,
+                                      fill_edge=True).deriv()
+            edge = flow * FwdDeriv(self.arr, self.dim, order=o).deriv()
+            desired[{self.dim: slice(0, 1)}] = edge[{self.dim: slice(0, 1)}]
+            actual = self._ADVEC_CLS(flow, self.arr, self.dim, order=o,
+                                     fill_edge=True).advec()
+            self.assertDatasetIdentical(actual, desired)
 
-        # Do not fill edge.
-        desired = flow * BwdDeriv(self.arr, self.dim, order=1,
-                                  fill_edge=False).deriv()
-        desired = desired[{self.dim: slice(None, -1)}]
-        actual = self._ADVEC_CLS(flow, self.arr, self.dim, order=1,
-                                 fill_edge=False).advec()
-        self.assertDatasetIdentical(actual, desired)
+    def test_advec_pos_flow_no_fill(self):
+        flow = np.abs(self.random)
+        for o in [1, 2]:
+            desired = flow[{self.dim: slice(None, -o)}] * BwdDeriv(
+                self.arr, self.dim, order=o, fill_edge=False
+            ).deriv()
+            actual = self._ADVEC_CLS(flow, self.arr, self.dim, order=o,
+                                     fill_edge=False).advec()
+            self.assertDatasetIdentical(actual, desired)
 
-    def test_neg_flow(self):
+    def test_advec_neg_flow_fill(self):
         flow = -1*np.abs(self.random)
-        # Do fill edge.
-        desired = flow * FwdDeriv(self.arr, self.dim, order=1,
-                                  fill_edge=True).deriv()
-        actual = self._ADVEC_CLS(flow, self.arr, self.dim, order=1,
-                                 fill_edge=True).advec()
-        self.assertDatasetIdentical(actual, desired)
+        for o in [1, 2]:
+            desired = flow * FwdDeriv(self.arr, self.dim, order=o,
+                                      fill_edge=True).deriv()
+            edge = flow * BwdDeriv(self.arr, self.dim, order=o).deriv()
+            desired[{self.dim: slice(-1, None)}] = edge[{self.dim:
+                                                         slice(-1, None)}]
+            actual = self._ADVEC_CLS(flow, self.arr, self.dim, order=o,
+                                     fill_edge=True).advec()
+            self.assertDatasetIdentical(actual, desired)
 
-        # Do not fill edge.
-        desired = flow * FwdDeriv(self.arr, self.dim, order=1,
-                                  fill_edge=False).deriv()
-        desired = desired[{self.dim: slice(1, None)}]
-        actual = self._ADVEC_CLS(flow, self.arr, self.dim, order=1,
-                                 fill_edge=False).advec()
-        self.assertDatasetIdentical(actual, desired)
+    def test_advec_neg_flow_no_fill(self):
+        flow = -1*np.abs(self.random)
+        for o in [1, 2]:
+            desired = flow[{self.dim: slice(o, None)}] * FwdDeriv(
+                self.arr, self.dim, order=o, fill_edge=False
+            ).deriv()
+            actual = self._ADVEC_CLS(flow, self.arr, self.dim, order=o,
+                                     fill_edge=False).advec()
+            self.assertDatasetIdentical(actual, desired)
 
 if __name__ == '__main__':
     sys.exit(unittest.main())
