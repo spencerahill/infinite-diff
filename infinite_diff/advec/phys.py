@@ -5,6 +5,13 @@ from ..deriv import (PhysDeriv, LonBwdDeriv, LonFwdDeriv, LatBwdDeriv,
 from . import Upwind
 
 
+def _make_derivs(obj, *deriv_args, **deriv_kwargs):
+    obj._deriv_bwd_obj = obj._DERIV_BWD_CLS(*deriv_args, **deriv_kwargs)
+    obj._deriv_fwd_obj = obj._DERIV_FWD_CLS(*deriv_args, **deriv_kwargs)
+    obj._deriv_bwd = getattr(obj._deriv_bwd_obj, obj._DERIV_METHOD)
+    obj._deriv_fwd = getattr(obj._deriv_fwd_obj, obj._DERIV_METHOD)
+
+
 class PhysUpwind(Upwind):
     """Upwind advection along a physical coordinate."""
     _DERIV_BWD_CLS = PhysDeriv
@@ -23,16 +30,10 @@ class PhysUpwind(Upwind):
         self.cyclic = cyclic
         self.fill_edge = fill_edge
 
-        self._deriv_bwd_obj = self._DERIV_BWD_CLS(
-            arr, dim, coord=coord, spacing=spacing, order=order,
-            cyclic=cyclic, fill_edge=fill_edge,
-        )
-        self._deriv_fwd_obj = self._DERIV_FWD_CLS(
-            arr, dim, coord=coord, spacing=spacing, order=order,
-            cyclic=cyclic, fill_edge=fill_edge
-        )
-        self._deriv_bwd = getattr(self._deriv_bwd_obj, self._DERIV_METHOD)
-        self._deriv_fwd = getattr(self._deriv_fwd_obj, self._DERIV_METHOD)
+        deriv_args = [arr, dim]
+        deriv_kwargs = dict(coord=coord, spacing=spacing, order=order,
+                            cyclic=cyclic, fill_edge=fill_edge)
+        _make_derivs(self, *deriv_args, **deriv_kwargs)
 
     def _derivs_bwd_fwd(self, *args, **kwargs):
         """Generate forward and backward differencing derivs for upwind.
@@ -85,16 +86,10 @@ class LonUpwind(PhysUpwind):
         self.dim = dim if dim is not None else self._DIM
         self.coord = coord if coord is not None else self.arr[self._DIM]
 
-        self._deriv_bwd_obj = self._DERIV_BWD_CLS(
-            arr, dim, coord=coord, spacing=spacing, order=order,
-            fill_edge=True, cyclic=cyclic
-        )
-        self._deriv_fwd_obj = self._DERIV_FWD_CLS(
-            arr, dim, coord=coord, spacing=spacing, order=order,
-            fill_edge=True, cyclic=cyclic
-        )
-        self._deriv_bwd = self._deriv_bwd_obj.deriv
-        self._deriv_fwd = self._deriv_fwd_obj.deriv
+        deriv_args = [arr, dim]
+        deriv_kwargs = dict(coord=coord, spacing=spacing, order=order,
+                            fill_edge=True, cyclic=cyclic)
+        _make_derivs(self, *deriv_args, **deriv_kwargs)
 
 
 class LatUpwind(PhysUpwind):
@@ -114,16 +109,10 @@ class LatUpwind(PhysUpwind):
         self.dim = dim if dim is not None else self._DIM
         self.coord = coord if coord is not None else self.arr[self._DIM]
 
-        self._deriv_bwd_obj = self._DERIV_BWD_CLS(
-            arr, dim, coord=coord, spacing=spacing, order=order,
-            fill_edge=True
-        )
-        self._deriv_fwd_obj = self._DERIV_FWD_CLS(
-            arr, dim, coord=coord, spacing=spacing, order=order,
-            fill_edge=True
-        )
-        self._deriv_bwd = self._deriv_bwd_obj.deriv
-        self._deriv_fwd = self._deriv_fwd_obj.deriv
+        deriv_args = [arr, dim]
+        deriv_kwargs = dict(coord=coord, spacing=spacing, order=order,
+                            fill_edge=True)
+        _make_derivs(self, *deriv_args, **deriv_kwargs)
 
 
 class EtaUpwind(PhysUpwind):
@@ -146,14 +135,9 @@ class EtaUpwind(PhysUpwind):
         self.dim = dim if dim is not None else self._DIM
         self.coord = coord if coord is not None else self.arr[self._DIM]
 
-        self._deriv_bwd_obj = self._DERIV_BWD_CLS(
-            arr, pk, bk, ps, spacing=spacing, order=order, fill_edge=True
-        )
-        self._deriv_fwd_obj = self._DERIV_FWD_CLS(
-            arr, pk, bk, ps, spacing=spacing, order=order, fill_edge=True
-        )
-        self._deriv_bwd = getattr(self._deriv_bwd_obj, self._DERIV_METHOD)
-        self._deriv_fwd = getattr(self._deriv_fwd_obj, self._DERIV_METHOD)
+        deriv_args = [arr, pk, bk, ps]
+        deriv_kwargs = dict(spacing=spacing, order=order, fill_edge=True)
+        _make_derivs(self, *deriv_args, **deriv_kwargs)
 
 
 class LonUpwindConstP(PhysUpwind):
@@ -181,11 +165,7 @@ class LonUpwindConstP(PhysUpwind):
         deriv_args = [self.arr, self.pk, self.bk, self.ps]
         deriv_kwargs = dict(spacing=spacing, order=order, cyclic_lon=cyclic,
                             fill_edge_lon=fill_edge)
-
-        self._deriv_bwd_obj = self._DERIV_BWD_CLS(*deriv_args, **deriv_kwargs)
-        self._deriv_fwd_obj = self._DERIV_FWD_CLS(*deriv_args, **deriv_kwargs)
-        self._deriv_bwd = getattr(self._deriv_bwd_obj, self._DERIV_METHOD)
-        self._deriv_fwd = getattr(self._deriv_fwd_obj, self._DERIV_METHOD)
+        _make_derivs(self, *deriv_args, **deriv_kwargs)
 
 
 class LatUpwindConstP(PhysUpwind):
@@ -209,16 +189,10 @@ class LatUpwindConstP(PhysUpwind):
         self.dim = dim if dim is not None else self._DIM
         self.coord = coord if coord is not None else self.arr[self._DIM]
 
-        self._deriv_bwd_obj = self._DERIV_BWD_CLS(
-            arr, pk, bk, ps, spacing=spacing, order=order,
-            fill_edge_lat=fill_edge
-        )
-        self._deriv_fwd_obj = self._DERIV_FWD_CLS(
-            arr, pk, bk, ps, spacing=spacing, order=order,
-            fill_edge_lat=fill_edge
-        )
-        self._deriv_bwd = getattr(self._deriv_bwd_obj, self._DERIV_METHOD)
-        self._deriv_fwd = getattr(self._deriv_fwd_obj, self._DERIV_METHOD)
+        deriv_args = [self.arr, self.pk, self.bk, self.ps]
+        deriv_kwargs = dict(spacing=spacing, order=order,
+                            fill_edge_lat=fill_edge)
+        _make_derivs(self, *deriv_args, **deriv_kwargs)
 
 
 class SphereEtaUpwind(object):
@@ -241,12 +215,15 @@ class SphereEtaUpwind(object):
         self.fill_edge_lat = fill_edge_lat
         self.fill_edge_vert = fill_edge_vert
         self._advec_args = [self.arr, self.pk, self.bk, self.ps]
+
         advec_kwargs = dict(spacing=spacing, order=order,
                             fill_edge=fill_edge_lon, cyclic=cyclic_lon)
         self._advec_x_kwargs = advec_kwargs
+
         advec_kwargs.pop('cyclic')
         advec_kwargs.update(dict(fill_edge=fill_edge_lat))
         self._advec_y_kwargs = advec_kwargs
+
         advec_kwargs.update(dict(fill_edge=fill_edge_vert))
         self._advec_z_kwargs = advec_kwargs
 
