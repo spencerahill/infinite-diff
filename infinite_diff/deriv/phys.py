@@ -46,7 +46,7 @@ class PhysDeriv(object):
                 right_to_left=self._WRAP_RIGHT_TO_LEFT*self.order,
                 circumf=self._WRAP_CIRCUMF, spacing=self.spacing
             )
-        return self.arr
+        return arr
 
     def _prep_coord(self):
         return self._wrap(self.coord)
@@ -55,10 +55,10 @@ class PhysDeriv(object):
         """Derivative, incorporating physical/geometrical factors."""
         arr = self._wrap(self.arr)*self.deriv_factor(*args, **kwargs)
         coord = self._prep_coord()
-        darr = (self._coord_obj.deriv_prefactor(*args, **kwargs) *
-                self._DERIV_CLS(arr, self.dim, coord=coord,
+        darr = (self._DERIV_CLS(arr, self.dim, coord=coord,
                                 spacing=self.spacing, order=self.order,
-                                fill_edge=self.fill_edge).deriv())
+                                fill_edge=self.fill_edge).deriv() *
+                self._coord_obj.deriv_prefactor(*args, **kwargs))
         darr[self.dim] = self.coord
         return darr
 
@@ -272,10 +272,10 @@ class SphereEtaDeriv(object):
         )
 
     def horiz_grad_const_p(self):
-        return self.d_dx_const_p() + self.d_dy_const_p()
+        return self.d_dx_const_p() + self.d_dy_const_p(oper='grad')
 
     def grad_3d(self):
-        return self.horiz_grad_const_p() + self.d_dp()
+        return self.horiz_grad_const_p(oper='grad') + self.d_dp()
 
 
 class SphereEtaFwdDeriv(SphereEtaDeriv):

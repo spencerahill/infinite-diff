@@ -39,6 +39,11 @@ class TestPhysDeriv(PhysDerivSharedTests, PhysDerivTestCase):
     def test_deriv(self):
         self.assertNotImplemented(self.deriv_obj.deriv)
 
+    def test_wrap(self):
+        # Not cyclic.
+        self.assertDatasetIdentical(self.arr, self.deriv_obj._wrap(self.arr))
+        # TODO: cyclic
+
 
 class LonDerivTestCase(PhysDerivTestCase):
     _DERIV_CLS = LonDeriv
@@ -101,6 +106,17 @@ class TestLonFwdDeriv(TestLonDeriv, LonFwdDerivTestCase):
         actual = deriv_obj.deriv(self.lat)
         desired = self.arr2
         self.assertCoordsIdentical(actual, desired)
+        # With extra, non-lat, non-lon dimension.
+        arr = xr.DataArray(
+            np.random.random((self.pfull.size, self.lat.size, self.lon.size)),
+            dims=[PFULL_STR, LAT_STR, LON_STR],
+            coords={PFULL_STR: self.pfull, LON_STR: self.lon,
+                    LAT_STR: self.lat}
+        )
+        deriv_obj = self._DERIV_CLS(arr, self.dim, cyclic=True)
+        actual = deriv_obj.deriv(self.lat)
+        desired = arr
+        self.assertCoordsIdentical(actual, desired)
 
     def test_deriv_output_coords_not_cyclic(self):
         # Scalar latitude.
@@ -132,7 +148,7 @@ class TestLonBwdDeriv(TestLonFwdDeriv, LonBwdDerivTestCase):
 
 class LatDerivTestCase(PhysDerivTestCase):
     _DERIV_CLS = LatDeriv
-    _COORD_KWARGS = {}
+    _COORD_KWARGS = dict(fill_edge=True)
 
     def setUp(self):
         super(LatDerivTestCase, self).setUp()
@@ -144,6 +160,10 @@ class LatDerivTestCase(PhysDerivTestCase):
             dims=[LAT_STR, LON_STR],
             coords={LON_STR: self.lon, LAT_STR: self.lat}
         )
+        self.zeros = xr.DataArray(np.zeros(self.arr.shape), dims=self.arr.dims,
+                                  coords=self.arr.coords)
+        self.ones = xr.DataArray(np.ones(self.arr.shape), dims=self.arr.dims,
+                                 coords=self.arr.coords)
         self.deriv_obj = self._DERIV_CLS(self.arr, self.dim,
                                          **self._COORD_KWARGS)
 
@@ -171,19 +191,38 @@ class LatFwdDerivTestCase(LatDerivTestCase):
                                          **self._COORD_KWARGS)
 
 
-class TestLatFwdDeriv(TestLatDeriv, LatFwdDerivTestCase):
-    def test_deriv(self):
+class TestLatFwdDeriv(PhysDerivSharedTests, LatFwdDerivTestCase):
+    def test_deriv_output_coords(self):
         for oper in ['grad', 'divg']:
-            # Scalar latitude.
-            actual = self.deriv_obj.deriv(oper=oper).shape
-            desired = self.deriv_obj.arr.shape
-            self.assertEqual(actual, desired)
+            # Scalar latitude
+            actual = self.deriv_obj.deriv(oper=oper)
+            desired = self.deriv_obj.arr
+            self.assertCoordsIdentical(actual, desired)
             # Array of latitudes.
             deriv_obj = self._DERIV_CLS(self.arr2, self.dim,
                                         **self._COORD_KWARGS)
-            actual = deriv_obj.deriv(oper=oper).shape
-            desired = self.arr2.shape
-            self.assertEqual(actual, desired)
+            actual = deriv_obj.deriv(oper=oper)
+            desired = self.arr2
+            self.assertCoordsIdentical(actual, desired)
+
+        # With extra, non-lat, non-lon dimension.
+        arr = xr.DataArray(
+            np.random.random((self.pfull.size, self.lat.size, self.lon.size)),
+            dims=[PFULL_STR, LAT_STR, LON_STR],
+            coords={PFULL_STR: self.pfull, LON_STR: self.lon,
+                    LAT_STR: self.lat}
+        )
+        deriv_obj = self._DERIV_CLS(arr, self.dim, fill_edge=True)
+        desired = arr
+        for oper in ['grad', 'divg']:
+            actual = deriv_obj.deriv(oper=oper)
+            self.assertCoordsIdentical(actual, desired)
+
+    def test_deriv_zero_slope(self):
+        desired = self.zeros
+        for o in [1, 2]:
+            actual = self._DERIV_CLS(self.ones, self.dim, order=o).deriv()
+        self.assertDatasetIdentical(actual, desired)
 
 
 class LatBwdDerivTestCase(LatFwdDerivTestCase):
@@ -205,6 +244,10 @@ class SphereFwdDerivTestCase(InfiniteDiffTestCase):
             coords={PFULL_STR: self.pfull, LAT_STR: self.lat,
                     LON_STR: self.lon}
         )
+        self.zeros = xr.DataArray(np.zeros(self.arr.shape), dims=self.arr.dims,
+                                  coords=self.arr.coords)
+        self.ones = xr.DataArray(np.ones(self.arr.shape), dims=self.arr.dims,
+                                 coords=self.arr.coords)
         self.deriv_obj = self._DERIV_CLS(self.arr)
 
 
@@ -225,6 +268,16 @@ class TestSphereFwdDeriv(PhysDerivSharedTests, SphereFwdDerivTestCase):
                                             fill_edge_lat=True)
                 actual = getattr(deriv_obj, deriv)()
                 self.assertCoordsIdentical(actual, desired)
+
+    def test_deriv_zero_slope(self):
+        desired = self.zeros
+        for deriv in ['d_dx', 'd_dy']:
+            for o in [1, 2]:
+                deriv_obj = self._DERIV_CLS(self.ones, order=o,
+                                            cyclic_lon=True,
+                                            fill_edge_lat=True)
+                actual = getattr(deriv_obj, deriv)()
+                self.assertArrayEqual(actual, desired)
 
 
 class SphereBwdDerivTestCase(SphereFwdDerivTestCase):
@@ -310,6 +363,7 @@ class TestSphereEtaDeriv(PhysDerivSharedTests, SphereEtaDerivTestCase):
 
 class SphereEtaFwdDerivTestCase(SphereEtaDerivTestCase):
     _DERIV_CLS = SphereEtaFwdDeriv
+    _SPHERE_CLS = SphereFwdDeriv
 
 
 class TestSphereEtaFwdDeriv(TestSphereEtaDeriv, SphereEtaFwdDerivTestCase):
@@ -333,9 +387,22 @@ class TestSphereEtaFwdDeriv(TestSphereEtaDeriv, SphereEtaFwdDerivTestCase):
                 actual = getattr(deriv_obj, deriv)()
                 self.assertCoordsIdentical(actual, desired)
 
+    def test_deriv_uniform_ps(self):
+        ps = self.ps.copy()
+        ps.values = 1e5*np.ones(self.ps.shape)
+        sphere_eta_obj = self._DERIV_CLS(self.arr, self.pk, self.bk, ps,
+                                         order=1, fill_edge_lat=True)
+        sphere_obj = self._SPHERE_CLS(self.arr, order=1)
+        derivs = ['d_dx', 'd_dy', 'horiz_grad']
+        derivs_p = [d + '_const_p' for d in derivs]
+        for deriv, deriv_p in zip(derivs, derivs_p):
+            self.assertArrayEqual(getattr(sphere_eta_obj, deriv_p)(),
+                                  getattr(sphere_obj, deriv)())
+
 
 class SphereEtaBwdDerivTestCase(SphereEtaDerivTestCase):
     _DERIV_CLS = SphereEtaBwdDeriv
+    _SPHERE_CLS = SphereBwdDeriv
 
 
 class TestSphereEtaBwdDeriv(TestSphereEtaFwdDeriv, SphereEtaBwdDerivTestCase):

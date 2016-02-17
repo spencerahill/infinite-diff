@@ -92,13 +92,16 @@ class InfiniteDiffTestCase(unittest.TestCase):
         self.sigma = xr.DataArray(sigma, dims=['sigma'],
                                   coords={'sigma': sigma})
 
+    def assertArrayEqual(self, arr1, arr2):
+        np.testing.assert_array_equal(arr1, arr2)
+
     def assertDatasetIdentical(self, d1, d2):
         assert d1.identical(d2), (d1, d2, d1/d2)
 
     def assertCoordsIdentical(self, d1, d2):
         for dim in d1.dims:
             assert d1[dim].identical(d2[dim]), (dim, d1[dim], d2[dim])
-        assert len(d1.shape) == len(d2.shape)
+        assert d1.shape == d2.shape, ('shape mismatch', d1.shape, d2.shape)
 
     def assertNotImplemented(self, func, *args, **kwargs):
         self.assertRaises(NotImplementedError, func, *args, **kwargs)
