@@ -3,7 +3,7 @@
 
 class FiniteDiff(object):
     """Base class for finite differencing of xarray objects."""
-    def __init__(self, arr, dim, spacing=1):
+    def __init__(self, arr, dim, spacing=1, wrap=False):
         """
         Create a `FiniteDiff` object.
 
@@ -16,6 +16,7 @@ class FiniteDiff(object):
         self.arr = arr
         self.dim = dim
         self.spacing = spacing
+        self.wrap = wrap
 
     def _slice_arr_dim(self, slice_, arr):
         """Get a slice of a DataArray along a particular dim."""
@@ -25,14 +26,8 @@ class FiniteDiff(object):
         """Reverse the DataArray along the given dimension."""
         return self._slice_arr_dim(slice(-1, None, -1), arr)
 
-    def _diff(self):
-        raise NotImplementedError
-
-    def _diff_rev(self):
+    def _wrap(self):
         raise NotImplementedError
 
     def diff(self):
-        raise NotImplementedError
-
-    def diff_rev(self):
         raise NotImplementedError

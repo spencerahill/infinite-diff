@@ -1,6 +1,7 @@
 """Centered finite differencing."""
 import xarray as xr
 
+from ..utils import wraparound
 from . import FiniteDiff, BwdDiff, FwdDiff
 
 
@@ -10,7 +11,7 @@ class CenDiff(FiniteDiff):
     _DIFF_BWD_CLS = BwdDiff
     _DIFF_FWD_CLS = FwdDiff
 
-    def __init__(self, arr, dim, spacing=1, fill_edge=False):
+    def __init__(self, arr, dim, spacing=1, fill_edge=False, wrap=False):
         super(CenDiff, self).__init__(arr, dim, spacing=spacing)
         assert fill_edge in (False, 'left', 'right', 'both', True), fill_edge
         self.fill_edge = fill_edge
@@ -30,6 +31,10 @@ class CenDiff(FiniteDiff):
                              "or 'right': {}").format(side)
         arr_edge = self._slice_arr_dim(trunc, self.arr)
         return cls(arr_edge, self.dim, spacing=self.spacing).diff()
+
+    def _wrap(self):
+        return wraparound(self.arr, self.dim, left_to_right=self.spacing,
+                          right_to_left=self.spacing, circumf=0, spacing=1)
 
     def diff(self):
         """Centered differencing of the DataArray or Dataset.

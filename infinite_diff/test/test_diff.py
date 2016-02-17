@@ -27,12 +27,6 @@ class DiffSharedTests(object):
                                coords={self.dim: values[::-1]})
         self.assertDatasetIdentical(actual, desired)
 
-    def test_diff(self):
-        self.assertNotImplemented(self.diff_obj.diff)
-        self.assertNotImplemented(self.diff_obj._diff)
-        self.assertNotImplemented(self.diff_obj.diff_rev)
-        self.assertNotImplemented(self.diff_obj._diff_rev)
-
 
 class FiniteDiffTestCase(InfiniteDiffTestCase):
     _DIFF_CLS = FiniteDiff
