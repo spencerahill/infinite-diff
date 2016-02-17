@@ -4,13 +4,14 @@ import unittest
 import numpy as np
 import xarray as xr
 
+from infinite_diff._constants import LON_STR, LAT_STR, PFULL_STR
+from infinite_diff.utils import wraparound
 from infinite_diff.deriv import (
     PhysDeriv, LonDeriv, LatDeriv, SphereEtaDeriv,
     LonFwdDeriv, LatFwdDeriv, EtaFwdDeriv, SphereFwdDeriv,
     LonBwdDeriv, LatBwdDeriv, EtaBwdDeriv, SphereBwdDeriv,
     SphereEtaFwdDeriv, SphereEtaBwdDeriv
 )
-from infinite_diff._constants import LON_STR, LAT_STR, PFULL_STR
 
 from . import InfiniteDiffTestCase
 
@@ -39,10 +40,23 @@ class TestPhysDeriv(PhysDerivSharedTests, PhysDerivTestCase):
     def test_deriv(self):
         self.assertNotImplemented(self.deriv_obj.deriv)
 
-    def test_wrap(self):
-        # Not cyclic.
-        self.assertDatasetIdentical(self.arr, self.deriv_obj._wrap(self.arr))
-        # TODO: cyclic
+
+def _test_wrap_not_cyclic(obj, order):
+    deriv_obj = obj._DERIV_CLS(obj.arr, obj.dim, order=order, cyclic=False)
+    actual = deriv_obj._wrap(obj.arr)
+    desired = obj.arr
+    obj.assertDatasetIdentical(actual, desired)
+
+
+def _test_wrap_cyclic(obj, order):
+    deriv_obj = obj._DERIV_CLS(obj.arr, obj.dim, order=order, cyclic=True)
+    actual = deriv_obj._wrap(obj.arr)
+    desired = wraparound(
+        obj.arr, obj.dim, circumf=obj._DERIV_CLS._WRAP_CIRCUMF,
+        left_to_right=obj._DERIV_CLS._WRAP_LEFT_TO_RIGHT*order,
+        right_to_left=obj._DERIV_CLS._WRAP_RIGHT_TO_LEFT*order
+    )
+    obj.assertDatasetIdentical(actual, desired)
 
 
 class LonDerivTestCase(PhysDerivTestCase):
@@ -62,6 +76,14 @@ class LonDerivTestCase(PhysDerivTestCase):
 class TestLonDeriv(PhysDerivSharedTests, LonDerivTestCase):
     def test_deriv(self):
         self.assertNotImplemented(self.deriv_obj.deriv, 1)
+
+    def test_wrap_cyclic(self):
+        for order in [1, 2]:
+            _test_wrap_cyclic(self, order)
+
+    def test_wrap_not_cyclic(self):
+        for order in [1, 2]:
+            _test_wrap_not_cyclic(self, order)
 
 
 class LonFwdDerivTestCase(LonDerivTestCase):
@@ -171,6 +193,13 @@ class LatDerivTestCase(PhysDerivTestCase):
 class TestLatDeriv(PhysDerivSharedTests, LatDerivTestCase):
     def test_deriv(self):
         self.assertNotImplemented(self.deriv_obj.deriv, 'divg')
+
+    def test_wrap(self):
+        desired = self.arr
+        for order in [1, 2]:
+            deriv_obj = self._DERIV_CLS(self.arr, self.dim, order=order)
+            actual = deriv_obj._wrap(self.arr)
+            self.assertDatasetIdentical(actual, desired)
 
 
 class LatFwdDerivTestCase(LatDerivTestCase):
