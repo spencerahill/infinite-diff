@@ -22,12 +22,6 @@ class CoordSharedTests(object):
             self.assertDatasetIdentical(self.coord_obj[key],
                                         self.coord_obj.arr[key])
 
-    def test_deriv_prefactor(self):
-        self.assertNotImplemented(self.coord_obj.deriv_prefactor)
-
-    def test_deriv_factor(self):
-        self.assertNotImplemented(self.coord_obj.deriv_factor)
-
 
 class CoordTestCase(InfiniteDiffTestCase):
     _COORD_CLS = Coord
@@ -40,8 +34,12 @@ class CoordTestCase(InfiniteDiffTestCase):
         self.coord_obj = Coord(self.arr, dim=self.dim, **self._INIT_KWARGS)
 
 
-class TestCoord(CoordTestCase, CoordSharedTests):
-    pass
+class TestCoord(CoordSharedTests, CoordTestCase):
+    def test_deriv_prefactor(self):
+        self.assertNotImplemented(self.coord_obj.deriv_prefactor)
+
+    def test_deriv_factor(self):
+        self.assertNotImplemented(self.coord_obj.deriv_factor)
 
 
 class HorizCoordTestCase(CoordTestCase):
@@ -53,7 +51,7 @@ class HorizCoordTestCase(CoordTestCase):
                                     cyclic=self._CYCLIC)
 
 
-class TestHorizCoord(HorizCoordTestCase, TestCoord):
+class TestHorizCoord(TestCoord, HorizCoordTestCase):
     pass
 
 
@@ -80,7 +78,7 @@ class YCoordTestCase(XCoordTestCase):
         super(YCoordTestCase, self).setUp()
 
 
-class TestYCoord(YCoordTestCase, TestXCoord):
+class TestYCoord(TestXCoord, YCoordTestCase):
     def setUp(self):
         super(TestYCoord, self).setUp()
         self.coord_obj = YCoord(self.arr, dim=self.dim, cyclic=self._CYCLIC)
@@ -225,7 +223,7 @@ class TestEta(EtaTestCase, TestVertCoord):
     def test_pfull_from_ps(self):
         for ps in [1e5, self.ps]:
             actual = self.coord_obj.pfull_from_ps(ps)
-            desired = (ps*self.pfull)
+            desired = self.pfull*ps
             self.assertCoordsIdentical(actual, desired)
 
     def test_d_deta_from_phalf(self):
@@ -241,7 +239,7 @@ class TestEta(EtaTestCase, TestVertCoord):
     def test_dp_from_ps(self):
         for ps in [1e5, self.ps]:
             actual = self.coord_obj.dp_from_ps(ps)
-            desired = (ps*self.pfull)
+            desired = self.pfull*ps
             self.assertCoordsIdentical(actual, desired)
 
 if __name__ == '__main__':

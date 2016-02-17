@@ -46,7 +46,6 @@ class Lon(XCoord):
     def __init__(self, lon, dim=None, cyclic=True, radius=_RADEARTH):
         super(Lon, self).__init__(lon, dim=dim, cyclic=cyclic)
         self.radius = radius
-        self._lon_rad = to_radians(lon)
 
     def deriv_prefactor(self, lat):
         return 1. / (self.radius * np.cos(to_radians(lat)))
