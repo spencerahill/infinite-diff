@@ -36,14 +36,14 @@ def to_radians(arr, is_delta=False):
     return arr
 
 
-def wraparound(arr, dim, left_to_right=1, right_to_left=1,
+def wraparound(arr, dim, left_to_right=0, right_to_left=0,
                circumf=360., spacing=1):
     """Append wrap-around point(s) to the DataArray or Dataset coord."""
     arr_out = arr.copy()
     if left_to_right:
         edge_left = arr.copy()[{dim: slice(0, left_to_right, spacing)}]
         edge_left[dim] += circumf
-        arr_out = xr.concat([arr, edge_left], dim=dim)
+        arr_out = xr.concat([arr_out, edge_left], dim=dim)
     if right_to_left:
         edge_right = arr.copy()[{dim: slice(-right_to_left, None, spacing)}]
         edge_right[dim] -= circumf
