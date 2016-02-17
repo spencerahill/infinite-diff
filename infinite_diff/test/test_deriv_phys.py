@@ -277,7 +277,7 @@ class TestSphereFwdDeriv(PhysDerivSharedTests, SphereFwdDerivTestCase):
                                             cyclic_lon=True,
                                             fill_edge_lat=True)
                 actual = getattr(deriv_obj, deriv)()
-                self.assertArrayEqual(actual, desired)
+                self.assertDatasetIdentical(actual, desired)
 
 
 class SphereBwdDerivTestCase(SphereFwdDerivTestCase):
@@ -396,8 +396,8 @@ class TestSphereEtaFwdDeriv(TestSphereEtaDeriv, SphereEtaFwdDerivTestCase):
         derivs = ['d_dx', 'd_dy', 'horiz_grad']
         derivs_p = [d + '_const_p' for d in derivs]
         for deriv, deriv_p in zip(derivs, derivs_p):
-            self.assertArrayEqual(getattr(sphere_eta_obj, deriv_p)(),
-                                  getattr(sphere_obj, deriv)())
+            self.assertDatasetIdentical(getattr(sphere_eta_obj, deriv_p)(),
+                                        getattr(sphere_obj, deriv)())
 
 
 class SphereEtaBwdDerivTestCase(SphereEtaDerivTestCase):

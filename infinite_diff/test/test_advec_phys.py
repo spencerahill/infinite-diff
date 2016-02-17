@@ -1,3 +1,4 @@
+import itertools
 import sys
 import unittest
 
@@ -167,6 +168,17 @@ class TestLonUpwindConstP(PhysAdvecSharedTests, LonUpwindConstPTestCase):
                                       fill_edge_lon=False).d_dx_const_p()
         self.assertDatasetIdentical(actual, desired)
 
+    def test_advec_unity_flow_not_cyclic(self):
+        ones = self.flow.copy()
+        ones.values = np.ones(ones.shape)
+        actual = self._ADVEC_CLS(ones, self.arr, self.pk, self.bk,
+                                 self.ps, order=1, cyclic=False,
+                                 fill_edge=True).advec()
+        desired = self._DERIV_BWD_CLS(self.arr, self.pk, self.bk, self.ps,
+                                      order=1, cyclic_lon=False,
+                                      fill_edge_lon=True).d_dx_const_p()
+        self.assertDatasetIdentical(actual, desired)
+
 
 class LatUpwindConstPTestCase(EtaUpwindTestCase):
     _ADVEC_CLS = LatUpwindConstP
@@ -223,17 +235,13 @@ class TestSphereEtaUpwind(SphereEtaUpwindTestCase):
 
     def test_advec_output_coords(self):
         desired = self.arr
-        for o in [1, 2]:
-            # Cyclic.
-            actual = self._ADVEC_CLS(self.arr, self.pk, self.bk,
-                                     self.ps, order=o, cyclic_lon=True
-                                     ).advec_x_const_p(self.flow)
-            self.assertCoordsIdentical(actual, desired)
-            # Not cyclic, but fill edges.
-            actual = self._ADVEC_CLS(
-                self.arr, self.pk, self.bk, self.ps, order=o, cyclic_lon=False,
-                fill_edge_lon=True
-            ).advec_x_const_p(self.flow)
+        orders = [1, 2]
+        cyclics = [True, False]
+        methods = ['advec_x_const_p', 'advec_y_const_p', 'advec_p']
+        for o, cyclic, method in itertools.product(orders, cyclics, methods):
+            advec_obj = self._ADVEC_CLS(self.arr, self.pk, self.bk,
+                                        self.ps, order=o, cyclic_lon=cyclic)
+            actual = getattr(advec_obj, method)(self.flow)
             self.assertCoordsIdentical(actual, desired)
 
     def test_advec_zero_flow(self):
