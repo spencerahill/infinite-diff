@@ -1,19 +1,14 @@
 """Vertically oriented coordinates."""
 from .._constants import PHALF_STR, PFULL_STR
+from ..utils import replace_coord
 from ..diff import CenDiff
 from . import Coord
 
 
-def replace_coord(arr, old_dim, new_dim, new_coord):
-    """Replace a coordinate with new one; new and old must have same shape."""
-    new_arr = arr.rename({old_dim: new_dim})
-    ds = new_arr.to_dataset(name='new_arr')
-    ds[new_dim] = new_coord
-    return ds['new_arr']
-
-
 class VertCoord(Coord):
     """Base class for vertical coordinates."""
+    _POSSIBLY_CYCLIC = False
+
     def __init__(self, arr, dim=None):
         super(VertCoord, self).__init__(arr, dim=dim, cyclic=False)
 
@@ -56,10 +51,10 @@ class Eta(VertCoord):
 
     def to_pfull_from_phalf(self, arr):
         """Compute data at full pressure levels from values at half levels."""
-        arr_top = arr[{PHALF_STR: slice(1, None)}]
+        arr_top = arr.copy()[{PHALF_STR: slice(1, None)}]
         arr_top = replace_coord(arr_top, PHALF_STR, PFULL_STR, self.pfull)
 
-        arr_bot = arr[{PHALF_STR: slice(None, -1)}]
+        arr_bot = arr.copy()[{PHALF_STR: slice(None, -1)}]
         arr_bot = replace_coord(arr_bot, PHALF_STR, PFULL_STR, self.pfull)
         return 0.5*(arr_bot + arr_top)
 
@@ -79,7 +74,7 @@ class Eta(VertCoord):
         simply increment by 1 from 0 at the surface upwards.  The data to be
         differenced is assumed to be defined at full pressure levels.
         """
-        deriv = CenDiff(arr, PFULL_STR, fill_edge=True).diff() / 2.
+        deriv = CenDiff(arr, PFULL_STR, spacing=1, fill_edge=True).diff() / 2.
         # Edges use 1-sided differencing, so only spanning one level, not two.
         deriv[{PFULL_STR: 0}] = deriv[{PFULL_STR: 0}] * 2.
         deriv[{PFULL_STR: -1}] = deriv[{PFULL_STR: -1}] * 2.

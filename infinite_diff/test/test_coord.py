@@ -200,6 +200,8 @@ class EtaTestCase(VertCoordTestCase):
     def setUp(self):
         super(EtaTestCase, self).setUp()
         self.arr = self.phalf
+        self.ps = self.ones.copy()
+        self.ps.values = 1e5 + 1e3*np.random.random(self.ones.shape)
         self.dim = PHALF_STR
         self.coord_obj = Eta(self.pk, self.bk, self.pfull, dim=self.dim)
 
@@ -207,9 +209,40 @@ class EtaTestCase(VertCoordTestCase):
 class TestEta(EtaTestCase, TestVertCoord):
     def test_init(self):
         self.assertIsInstance(self.coord_obj, self._COORD_CLS)
-        self.assertDatasetIdentical(self.coord_obj.arr.coords.to_dataset(),
-                                    self.arr.coords.to_dataset())
+        self.assertCoordsIdentical(self.coord_obj.arr, self.arr)
 
+    def test_phalf_from_ps(self):
+        for ps in [1e5, self.ps]:
+            actual = self.coord_obj.phalf_from_ps(ps)
+            desired = self.pk + self.bk*ps
+            self.assertDatasetIdentical(actual, desired)
+
+    def test_to_pfull_from_phalf(self):
+        actual = self.coord_obj.to_pfull_from_phalf(self.phalf)
+        desired = self.pfull
+        self.assertCoordsIdentical(actual, desired)
+
+    def test_pfull_from_ps(self):
+        for ps in [1e5, self.ps]:
+            actual = self.coord_obj.pfull_from_ps(ps)
+            desired = (ps*self.pfull)
+            self.assertCoordsIdentical(actual, desired)
+
+    def test_d_deta_from_phalf(self):
+        actual = self.coord_obj.d_deta_from_phalf(self.phalf)
+        desired = self.pfull
+        self.assertCoordsIdentical(actual, desired)
+
+    def test_d_deta_from_pfull(self):
+        actual = self.coord_obj.d_deta_from_pfull(self.pfull)
+        desired = self.pfull
+        self.assertCoordsIdentical(actual, desired)
+
+    def test_dp_from_ps(self):
+        for ps in [1e5, self.ps]:
+            actual = self.coord_obj.dp_from_ps(ps)
+            desired = (ps*self.pfull)
+            self.assertCoordsIdentical(actual, desired)
 
 if __name__ == '__main__':
     sys.exit(unittest.main())
