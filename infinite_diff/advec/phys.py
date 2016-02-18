@@ -46,7 +46,9 @@ class PhysUpwind(Upwind):
         """
         bwd = self._deriv_bwd(*args, **kwargs)
         fwd = self._deriv_fwd(*args, **kwargs)
-        # Forward diff on left edge; backward diff on right edge.
+        # Forward diff on left edge; backward diff on right edge if not cyclic.
+        if getattr(self, 'cyclic', False):
+            return bwd, fwd
         return self._swap_bwd_fwd_edges(bwd, fwd)
 
     def advec(self, *args, **kwargs):

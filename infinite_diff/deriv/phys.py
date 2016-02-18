@@ -16,12 +16,12 @@ class PhysDeriv(object):
 
     def _get_coord(self, coord):
         if coord is None:
-            return self.arr[self.dim].copy()
+            return self.arr[self.dim].copy(deep=True)
         return coord
 
     def __init__(self, arr, dim, coord=None, spacing=1, order=2,
                  fill_edge=True, **coord_kwargs):
-        self.arr = arr
+        self.arr = arr.copy(deep=True)
         self.dim = dim
         self.coord = self._get_coord(coord)
         self.spacing = spacing
@@ -41,25 +41,31 @@ class PhysDeriv(object):
     def _wrap(self, arr):
         if self.cyclic:
             return wraparound(
-                arr, self.dim,
+                arr.copy(deep=True), self.dim,
                 left_to_right=self._WRAP_LEFT_TO_RIGHT*self.order,
                 right_to_left=self._WRAP_RIGHT_TO_LEFT*self.order,
                 circumf=self._WRAP_CIRCUMF, spacing=self.spacing
             )
-        return arr
+        return arr.copy(deep=True)
 
-    def _prep_coord(self):
-        return self._wrap(self.coord)
+    def _prep_coord(self, coord):
+        return coord
 
     def deriv(self, *args, **kwargs):
         """Derivative, incorporating physical/geometrical factors."""
-        arr = self._wrap(self.arr)*self.deriv_factor(*args, **kwargs)
-        coord = self._prep_coord()
-        darr = (self._DERIV_CLS(arr, self.dim, coord=coord,
+        arr = self._wrap(self.arr.copy(deep=True) *
+                         self.deriv_factor(*args, **kwargs))
+        print(self.__class__)
+        print(arr[self.dim])
+        coord = self._prep_coord(arr[self.dim].copy(deep=True))
+        print(coord[self.dim])
+        darr = (self._DERIV_CLS(arr.copy(deep=True), self.dim,
+                                coord=coord.copy(deep=True),
                                 spacing=self.spacing, order=self.order,
                                 fill_edge=self.fill_edge).deriv() *
                 self._coord_obj.deriv_prefactor(*args, **kwargs))
-        darr[self.dim] = self.coord
+        # darr[self.dim] = self.coord
+        # darr = arr
         return darr
 
 
@@ -67,8 +73,8 @@ class LonDeriv(PhysDeriv):
     _COORD_CLS = Lon
     _WRAP_CIRCUMF = 360.
 
-    def _prep_coord(self):
-        return self._wrap(to_radians(self.coord))
+    def _prep_coord(self, coord):
+        return to_radians(coord.copy(deep=True))
 
 
 class LonFwdDeriv(LonDeriv):
@@ -90,8 +96,8 @@ class LonCenDeriv(LonDeriv):
 class LatDeriv(PhysDeriv):
     _COORD_CLS = Lat
 
-    def _prep_coord(self):
-        return self._wrap(to_radians(self.coord))
+    def _prep_coord(self, coord):
+        return to_radians(coord.copy(deep=True))
 
 
 class LatFwdDeriv(LatDeriv):
