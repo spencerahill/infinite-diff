@@ -91,16 +91,16 @@ class LonFwdDerivTestCase(LonDerivTestCase):
 
     def setUp(self):
         super(LonFwdDerivTestCase, self).setUp()
-        self.arr = xr.DataArray(np.random.random(self.lon.shape),
-                                dims=self.lon.dims, coords=self.lon.coords)
-        self.arr2 = xr.DataArray(
+        self.arr = xr.DataArray(
             np.random.random((self.lat.size, self.lon.size)),
             dims=[LAT_STR, LON_STR],
             coords={LON_STR: self.lon, LAT_STR: self.lat}
         )
-        self.zeros = xr.DataArray(np.zeros(self.lon.shape), dims=self.arr.dims,
+        self.arr2 = xr.DataArray(np.random.random(self.lon.shape),
+                                 dims=self.lon.dims, coords=self.lon.coords)
+        self.zeros = xr.DataArray(np.zeros(self.arr.shape), dims=self.arr.dims,
                                   coords=self.arr.coords)
-        self.ones = xr.DataArray(np.ones(self.lon.shape), dims=self.arr.dims,
+        self.ones = xr.DataArray(np.ones(self.arr.shape), dims=self.arr.dims,
                                  coords=self.arr.coords)
         self.deriv_obj = self._DERIV_CLS(self.arr, self.dim,
                                          **self._COORD_KWARGS)
@@ -120,13 +120,13 @@ class TestLonFwdDeriv(TestLonDeriv, LonFwdDerivTestCase):
 
     def test_deriv_output_coords(self):
         # Scalar latitude.
-        actual = self.deriv_obj.deriv(0.)
-        desired = self.deriv_obj.arr
+        deriv_obj = self._DERIV_CLS(self.arr2, self.dim, cyclic=True)
+        actual = deriv_obj.deriv(0.)
+        desired = self.arr2
         self.assertCoordsIdentical(actual, desired)
         # Array of latitudes.
-        deriv_obj = self._DERIV_CLS(self.arr2, self.dim, cyclic=True)
-        actual = deriv_obj.deriv(self.lat)
-        desired = self.arr2
+        actual = self.deriv_obj.deriv(self.lat)
+        desired = self.arr
         self.assertCoordsIdentical(actual, desired)
         # With extra, non-lat, non-lon dimension.
         arr = xr.DataArray(
@@ -142,14 +142,14 @@ class TestLonFwdDeriv(TestLonDeriv, LonFwdDerivTestCase):
 
     def test_deriv_output_coords_not_cyclic(self):
         # Scalar latitude.
-        actual = self._DERIV_CLS(self.arr, self.dim, cyclic=False,
+        actual = self._DERIV_CLS(self.arr2, self.dim, cyclic=False,
                                  fill_edge=True).deriv(0.)
-        desired = self.deriv_obj.arr
+        desired = self.arr2
         self.assertCoordsIdentical(actual, desired)
         # Array of latitudes.
-        actual = self._DERIV_CLS(self.arr2, self.dim, cyclic=False,
+        actual = self._DERIV_CLS(self.arr, self.dim, cyclic=False,
                                  fill_edge=True).deriv(self.lat)
-        desired = self.arr2
+        desired = self.arr
         self.assertCoordsIdentical(actual, desired)
 
     def test_deriv_zero_slope(self):
