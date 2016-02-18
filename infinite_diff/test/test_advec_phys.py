@@ -6,7 +6,8 @@ import numpy as np
 import xarray as xr
 
 from infinite_diff._constants import LAT_STR, LON_STR, PFULL_STR
-from infinite_diff.advec import (PhysUpwind, LonUpwind, LatUpwind, EtaUpwind,
+from infinite_diff.advec import (PhysUpwind, LonUpwind, LatUpwind,
+                                 SphereUpwind, EtaUpwind,
                                  SphereEtaUpwind, LonUpwindConstP,
                                  LatUpwindConstP)
 from infinite_diff.deriv import (PhysDeriv, LonFwdDeriv, LonBwdDeriv,
@@ -81,6 +82,46 @@ class LatUpwindTestCase(LonUpwindTestCase):
 class TestLatUpwind(PhysAdvecSharedTests, LatUpwindTestCase):
     def test_advec(self):
         self.advec_obj.advec()
+
+
+class SphereUpwindTestCase(InfiniteDiffTestCase):
+    _ADVEC_CLS = SphereUpwind
+
+    def setUp(self):
+        super(SphereUpwindTestCase, self).setUp()
+        self.flow = xr.DataArray(
+            np.random.random((len(self.pfull), len(self.lat), len(self.lon))),
+            dims=[PFULL_STR, LAT_STR, LON_STR],
+            coords={PFULL_STR: self.pfull, LAT_STR: self.lat,
+                    LON_STR: self.lon}
+        )
+        self.arr = xr.DataArray(np.random.random(self.flow.shape),
+                                dims=self.flow.dims, coords=self.flow.coords)
+        self.advec_obj = self._ADVEC_CLS(self.arr)
+
+
+class TestSphereUpwind(SphereUpwindTestCase):
+    def test_advec(self):
+        self.advec_obj.advec_x(self.flow)
+        self.advec_obj.advec_y(self.flow)
+        self.advec_obj.advec(self.flow, self.flow)
+
+    def test_advec_output_coords(self):
+        desired = self.arr
+        orders = [1, 2]
+        cyclics = [True, False]
+        methods = ['advec_x', 'advec_y']
+        for o, cyclic, method in itertools.product(orders, cyclics, methods):
+            advec_obj = self._ADVEC_CLS(self.arr, order=o, cyclic_lon=cyclic)
+            actual = getattr(advec_obj, method)(self.flow)
+            self.assertCoordsIdentical(actual, desired)
+
+    def test_advec_zero_flow(self):
+        zeros = self.flow.copy()
+        zeros.values = np.zeros(zeros.shape)
+        self.assertAllZeros(self.advec_obj.advec_x(zeros))
+        self.assertAllZeros(self.advec_obj.advec_y(zeros))
+        self.assertAllZeros(self.advec_obj.advec(zeros, zeros))
 
 
 class EtaUpwindTestCase(InfiniteDiffTestCase):

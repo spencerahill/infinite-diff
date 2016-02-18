@@ -1,5 +1,3 @@
-import xarray as xr
-
 from .._constants import LON_STR, LAT_STR, PFULL_STR
 from ..utils import deep_copy
 from ..deriv import (PhysDeriv, LonBwdDeriv, LonFwdDeriv, LatBwdDeriv,
@@ -202,7 +200,46 @@ class LatUpwindConstP(PhysUpwind):
         _make_derivs(self, arr.copy(deep=True), *deriv_args, **deriv_kwargs)
 
 
+class SphereUpwind(PhysUpwind):
+    """Upwind horizontal advection in longitude and latitude."""
+    _X_ADVEC_CLS = LonUpwind
+    _Y_ADVEC_CLS = LatUpwind
+
+    def __init__(self, arr, spacing=1, order=2, cyclic_lon=True,
+                 fill_edge_lon=False, fill_edge_lat=True):
+        self.arr = arr.copy(deep=True)
+        self.lat = arr[LAT_STR]
+        self.spacing = spacing
+        self.order = order
+        self.cyclic_lon = cyclic_lon
+        self.fill_edge_lon = fill_edge_lon
+        self.fill_edge_lat = fill_edge_lat
+        self._advec_args = []
+
+        advec_kwargs = dict(spacing=spacing, order=order,
+                            fill_edge=fill_edge_lon, cyclic=cyclic_lon)
+        self._advec_x_kwargs = advec_kwargs
+
+        advec_kwargs.pop('cyclic')
+        advec_kwargs.update(dict(fill_edge=fill_edge_lat))
+        self._advec_y_kwargs = advec_kwargs
+
+    def advec_x(self, u):
+        return self._X_ADVEC_CLS(u, self.arr.copy(deep=True),
+                                 *self._advec_args,
+                                 **self._advec_x_kwargs).advec(self.lat)
+
+    def advec_y(self, v):
+        return self._Y_ADVEC_CLS(v, self.arr.copy(deep=True),
+                                 *self._advec_args,
+                                 **self._advec_y_kwargs).advec(oper='grad')
+
+    def advec(self, u, v):
+        return self.advec_x(u) + self.advec_y(v)
+
+
 class SphereEtaUpwind(object):
+    """Advection in lat-lon and hybrid sigma/pressure vertical coordinates."""
     _X_ADVEC_CLS = LonUpwindConstP
     _Y_ADVEC_CLS = LatUpwindConstP
     _Z_ADVEC_CLS = EtaUpwind
