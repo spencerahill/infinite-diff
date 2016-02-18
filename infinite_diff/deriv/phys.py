@@ -24,6 +24,7 @@ class PhysDeriv(object):
         self.arr = arr.copy(deep=True)
         self.dim = dim
         self.coord = self._get_coord(coord)
+        self._orig_coord_values = self.coord.values
         self.spacing = spacing
         self.order = order
         self.cyclic = coord_kwargs.get('cyclic', False)
@@ -55,17 +56,12 @@ class PhysDeriv(object):
         """Derivative, incorporating physical/geometrical factors."""
         arr = self._wrap(self.arr.copy(deep=True) *
                          self.deriv_factor(*args, **kwargs))
-        print(self.__class__)
-        print(arr[self.dim])
         coord = self._prep_coord(arr[self.dim].copy(deep=True))
-        print(coord[self.dim])
         darr = (self._DERIV_CLS(arr.copy(deep=True), self.dim,
                                 coord=coord.copy(deep=True),
                                 spacing=self.spacing, order=self.order,
                                 fill_edge=self.fill_edge).deriv() *
                 self._coord_obj.deriv_prefactor(*args, **kwargs))
-        # darr[self.dim] = self.coord
-        # darr = arr
         return darr
 
 
@@ -118,7 +114,7 @@ class EtaDeriv(object):
 
     def __init__(self, arr, pk, bk, ps, spacing=1, order=2, fill_edge=True,
                  **coord_kwargs):
-        self.arr = arr
+        self.arr = arr.copy(deep=True)
         self.dim = PFULL_STR
         self.ps = ps
         self.spacing = spacing
@@ -138,7 +134,7 @@ class EtaDeriv(object):
 
     def deriv(self):
         pfull = self.pfull_from_ps(self.ps)
-        return self._DERIV_CLS(self.arr, self.dim, coord=pfull,
+        return self._DERIV_CLS(self.arr.copy(deep=True), self.dim, coord=pfull,
                                spacing=self.spacing, order=self.order,
                                fill_edge=self.fill_edge).deriv()
 
@@ -162,10 +158,10 @@ class HorizPhysDeriv(object):
 
     def __init__(self, arr, x_dim, y_dim, x_coord=None, y_coord=None,
                  **kwargs):
-        self._x_deriv_obj = self._X_DERIV_CLS(arr, x_dim, coord=x_coord,
-                                              **kwargs)
-        self._y_deriv_obj = self._Y_DERIV_CLS(arr, y_dim, coord=y_coord,
-                                              **kwargs)
+        self._x_deriv_obj = self._X_DERIV_CLS(arr.copy(deep=True), x_dim,
+                                              coord=x_coord, **kwargs)
+        self._y_deriv_obj = self._Y_DERIV_CLS(arr.copy(deep=True), y_dim,
+                                              coord=y_coord, **kwargs)
 
     def d_dx(self, *args, **kwargs):
         return self._x_deriv_obj.deriv(*args, **kwargs)
@@ -184,19 +180,20 @@ class SphereDeriv(HorizPhysDeriv):
 
     def __init__(self, arr, x_coord=None, y_coord=None, cyclic_lon=True,
                  fill_edge_lon=False, fill_edge_lat=True, **kwargs):
-        self.arr = arr
+        self.arr = arr.copy(deep=True)
         self.cyclic_lon = cyclic_lon
         self._x_deriv_obj = self._X_DERIV_CLS(
-            arr, LON_STR, coord=x_coord, cyclic=cyclic_lon,
+            arr.copy(deep=True), LON_STR, coord=x_coord, cyclic=cyclic_lon,
             fill_edge=fill_edge_lon, **kwargs
         )
         self._y_deriv_obj = self._Y_DERIV_CLS(
-            arr, LAT_STR, coord=y_coord, fill_edge=fill_edge_lat, **kwargs
+            arr.copy(deep=True), LAT_STR, coord=y_coord,
+            fill_edge=fill_edge_lat, **kwargs
         )
         self.d_dy = self._y_deriv_obj.deriv
 
     def d_dx(self):
-        return self._x_deriv_obj.deriv(self.arr[LAT_STR])
+        return self._x_deriv_obj.deriv(self.arr.copy(deep=True)[LAT_STR])
 
     def horiz_grad(self):
         return self.d_dx() + self.d_dy(oper='grad')
@@ -222,7 +219,7 @@ class SphereEtaDeriv(object):
     def __init__(self, arr, pk, bk, ps, spacing=1, order=2, cyclic_lon=True,
                  fill_edge_lon=False, fill_edge_lat=True, fill_edge_vert=True,
                  radius=_RADEARTH):
-        self.arr = arr
+        self.arr = arr.copy(deep=True)
         self.pk = pk
         self.bk = bk
         self.ps = ps
@@ -239,17 +236,18 @@ class SphereEtaDeriv(object):
             fill_edge_lon=fill_edge_lon, fill_edge_lat=fill_edge_lat,
             radius=radius
         )
-        self._horiz_deriv_obj = self._HORIZ_DERIV_CLS(arr,
+        self._horiz_deriv_obj = self._HORIZ_DERIV_CLS(arr.copy(deep=True),
                                                       **horiz_deriv_kwargs)
-        self._ps_horiz_deriv_obj = self._HORIZ_DERIV_CLS(ps,
+        self._ps_horiz_deriv_obj = self._HORIZ_DERIV_CLS(ps.copy(deep=True),
                                                          **horiz_deriv_kwargs)
         for method in ['d_dx', 'd_dy', 'horiz_grad']:
             setattr(self, method, getattr(self._horiz_deriv_obj, method))
 
         vert_deriv_kwargs = dict(spacing=spacing, order=order,
                                  fill_edge=fill_edge_vert)
-        self._vert_deriv_obj = self._VERT_DERIV_CLS(arr, pk, bk, ps,
-                                                    **vert_deriv_kwargs)
+        self._vert_deriv_obj = self._VERT_DERIV_CLS(
+            arr.copy(deep=True), pk, bk, ps, **vert_deriv_kwargs
+        )
         for method in ['d_deta_from_pfull',
                        'd_deta_from_phalf',
                        'to_pfull_from_phalf']:
@@ -258,7 +256,7 @@ class SphereEtaDeriv(object):
 
     def _horiz_deriv_const_p(self, arr, arr_deriv, ps, ps_deriv):
         """Horizontal derivative in single direction at constant pressure."""
-        darr_deta = self.d_deta_from_pfull(arr)
+        darr_deta = self.d_deta_from_pfull(arr.copy(deep=True))
         bk_at_pfull = self.to_pfull_from_phalf(self.bk)
         da_deta = self.d_deta_from_phalf(self.pk)
         db_deta = self.d_deta_from_phalf(self.bk)
@@ -267,13 +265,13 @@ class SphereEtaDeriv(object):
 
     def d_dx_const_p(self):
         return self._horiz_deriv_const_p(
-            self.arr, self.d_dx(), self.ps,
+            self.arr.copy(deep=True), self.d_dx(), self.ps,
             self._ps_horiz_deriv_obj.d_dx()
         )
 
     def d_dy_const_p(self, oper='grad'):
         return self._horiz_deriv_const_p(
-            self.arr, self.d_dy(oper=oper), self.ps,
+            self.arr.copy(deep=True), self.d_dy(oper=oper), self.ps,
             self._ps_horiz_deriv_obj.d_dy(oper=oper)
         )
 
