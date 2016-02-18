@@ -1,14 +1,19 @@
+import xarray as xr
+
 from .._constants import LON_STR, LAT_STR, PFULL_STR
+from ..utils import deep_copy
 from ..deriv import (PhysDeriv, LonBwdDeriv, LonFwdDeriv, LatBwdDeriv,
                      LatFwdDeriv, EtaBwdDeriv, EtaFwdDeriv,
                      SphereEtaBwdDeriv, SphereEtaFwdDeriv)
 from . import Upwind
 
 
-def _make_derivs(obj, *deriv_args, **deriv_kwargs):
-    obj._deriv_bwd_obj = obj._DERIV_BWD_CLS(*deriv_args, **deriv_kwargs)
-    obj._deriv_fwd_obj = obj._DERIV_FWD_CLS(*deriv_args, **deriv_kwargs)
+def _make_derivs(obj, arr, *deriv_args, **deriv_kwargs):
+    b = deep_copy(arr)
+    f = deep_copy(arr)
+    obj._deriv_bwd_obj = obj._DERIV_BWD_CLS(b, *deriv_args, **deriv_kwargs)
     obj._deriv_bwd = getattr(obj._deriv_bwd_obj, obj._DERIV_METHOD)
+    obj._deriv_fwd_obj = obj._DERIV_FWD_CLS(f, *deriv_args, **deriv_kwargs)
     obj._deriv_fwd = getattr(obj._deriv_fwd_obj, obj._DERIV_METHOD)
 
 
@@ -22,7 +27,7 @@ class PhysUpwind(Upwind):
     def __init__(self, flow, arr, dim, coord=None, spacing=1, order=2,
                  cyclic=False, fill_edge=True):
         self.flow = flow
-        self.arr = arr
+        self.arr = arr.copy(deep=True)
         self.dim = dim
         self.coord = coord
         self.spacing = spacing
@@ -30,23 +35,25 @@ class PhysUpwind(Upwind):
         self.cyclic = cyclic
         self.fill_edge = fill_edge
 
-        deriv_args = [arr, dim]
+        deriv_args = [dim]
         deriv_kwargs = dict(coord=coord, spacing=spacing, order=order,
                             cyclic=cyclic, fill_edge=fill_edge)
-        _make_derivs(self, *deriv_args, **deriv_kwargs)
+        _make_derivs(self, arr.copy(deep=True), *deriv_args, **deriv_kwargs)
 
     def _derivs_bwd_fwd(self, *args, **kwargs):
         """Generate forward and backward differencing derivs for upwind.
 
-        Order of accuracy decreases moving towards edge (right edge for
-        forward, left edge for backward) as the differencing stencil starts to
-        extend over the domain edge.  At the edge itself, the opposite signed
-        differencing is used with the same order of accuracy as in the
-        interior.
+        If not cyclic, order of accuracy decreases moving towards edge (right
+        edge for forward, left edge for backward) as the differencing stencil
+        starts to extend over the domain edge.  At the edge itself, the
+        opposite signed differencing is used with the same order of accuracy as
+        in the interior.
         """
         bwd = self._deriv_bwd(*args, **kwargs)
         fwd = self._deriv_fwd(*args, **kwargs)
-        # Forward diff on left edge; backward diff on right edge.
+        # Forward diff on left edge; backward diff on right edge if not cyclic.
+        if getattr(self, 'cyclic', False):
+            return bwd, fwd
         return self._swap_bwd_fwd_edges(bwd, fwd)
 
     def advec(self, *args, **kwargs):
@@ -77,7 +84,7 @@ class LonUpwind(PhysUpwind):
     def __init__(self, flow, arr, dim=None, coord=None, spacing=1, order=2,
                  cyclic=True, fill_edge=False):
         self.flow = flow
-        self.arr = arr
+        self.arr = arr.copy(deep=True)
         self.spacing = spacing
         self.order = order
         self.cyclic = cyclic
@@ -86,10 +93,10 @@ class LonUpwind(PhysUpwind):
         self.dim = dim if dim is not None else self._DIM
         self.coord = coord if coord is not None else self.arr[self._DIM]
 
-        deriv_args = [arr, dim]
+        deriv_args = [self.dim]
         deriv_kwargs = dict(coord=coord, spacing=spacing, order=order,
                             fill_edge=True, cyclic=cyclic)
-        _make_derivs(self, *deriv_args, **deriv_kwargs)
+        _make_derivs(self, arr.copy(deep=True), *deriv_args, **deriv_kwargs)
 
 
 class LatUpwind(PhysUpwind):
@@ -101,7 +108,7 @@ class LatUpwind(PhysUpwind):
     def __init__(self, flow, arr, dim=None, coord=None, spacing=1, order=2,
                  fill_edge=True):
         self.flow = flow
-        self.arr = arr
+        self.arr = arr.copy(deep=True)
         self.spacing = spacing
         self.order = order
         self.fill_edge = fill_edge
@@ -109,10 +116,10 @@ class LatUpwind(PhysUpwind):
         self.dim = dim if dim is not None else self._DIM
         self.coord = coord if coord is not None else self.arr[self._DIM]
 
-        deriv_args = [arr, dim]
+        deriv_args = [self.dim]
         deriv_kwargs = dict(coord=coord, spacing=spacing, order=order,
                             fill_edge=True)
-        _make_derivs(self, *deriv_args, **deriv_kwargs)
+        _make_derivs(self, arr.copy(deep=True), *deriv_args, **deriv_kwargs)
 
 
 class EtaUpwind(PhysUpwind):
@@ -124,7 +131,7 @@ class EtaUpwind(PhysUpwind):
     def __init__(self, flow, arr, pk, bk, ps, dim=None, coord=None, spacing=1,
                  order=2, fill_edge=True):
         self.flow = flow
-        self.arr = arr
+        self.arr = arr.copy(deep=True)
         self.pk = pk
         self.bk = bk
         self.ps = ps
@@ -135,9 +142,9 @@ class EtaUpwind(PhysUpwind):
         self.dim = dim if dim is not None else self._DIM
         self.coord = coord if coord is not None else self.arr[self._DIM]
 
-        deriv_args = [arr, pk, bk, ps]
+        deriv_args = [self.pk, self.bk, self.ps]
         deriv_kwargs = dict(spacing=spacing, order=order, fill_edge=True)
-        _make_derivs(self, *deriv_args, **deriv_kwargs)
+        _make_derivs(self, arr.copy(deep=True), *deriv_args, **deriv_kwargs)
 
 
 class LonUpwindConstP(PhysUpwind):
@@ -150,7 +157,7 @@ class LonUpwindConstP(PhysUpwind):
     def __init__(self, flow, arr, pk, bk, ps, dim=None, coord=None, spacing=1,
                  order=2, cyclic=True, fill_edge=False):
         self.flow = flow
-        self.arr = arr
+        self.arr = arr.copy(deep=True)
         self.pk = pk
         self.bk = bk
         self.ps = ps
@@ -162,10 +169,10 @@ class LonUpwindConstP(PhysUpwind):
         self.dim = dim if dim is not None else self._DIM
         self.coord = coord if coord is not None else self.arr[self._DIM]
 
-        deriv_args = [self.arr, self.pk, self.bk, self.ps]
+        deriv_args = [self.pk, self.bk, self.ps]
         deriv_kwargs = dict(spacing=spacing, order=order, cyclic_lon=cyclic,
                             fill_edge_lon=fill_edge)
-        _make_derivs(self, *deriv_args, **deriv_kwargs)
+        _make_derivs(self, arr.copy(deep=True), *deriv_args, **deriv_kwargs)
 
 
 class LatUpwindConstP(PhysUpwind):
@@ -178,7 +185,7 @@ class LatUpwindConstP(PhysUpwind):
     def __init__(self, flow, arr, pk, bk, ps, dim=None, coord=None, spacing=1,
                  order=2, fill_edge=True):
         self.flow = flow
-        self.arr = arr
+        self.arr = arr.copy(deep=True)
         self.pk = pk
         self.bk = bk
         self.ps = ps
@@ -189,10 +196,10 @@ class LatUpwindConstP(PhysUpwind):
         self.dim = dim if dim is not None else self._DIM
         self.coord = coord if coord is not None else self.arr[self._DIM]
 
-        deriv_args = [self.arr, self.pk, self.bk, self.ps]
+        deriv_args = [self.pk, self.bk, self.ps]
         deriv_kwargs = dict(spacing=spacing, order=order,
                             fill_edge_lat=fill_edge)
-        _make_derivs(self, *deriv_args, **deriv_kwargs)
+        _make_derivs(self, arr.copy(deep=True), *deriv_args, **deriv_kwargs)
 
 
 class SphereEtaUpwind(object):
@@ -203,7 +210,7 @@ class SphereEtaUpwind(object):
     def __init__(self, arr, pk, bk, ps, spacing=1, order=2,
                  cyclic_lon=True, fill_edge_lon=False, fill_edge_lat=True,
                  fill_edge_vert=True):
-        self.arr = arr
+        self.arr = arr.copy(deep=True)
         self.lat = arr[LAT_STR]
         self.pk = pk
         self.bk = bk
@@ -214,7 +221,7 @@ class SphereEtaUpwind(object):
         self.fill_edge_lon = fill_edge_lon
         self.fill_edge_lat = fill_edge_lat
         self.fill_edge_vert = fill_edge_vert
-        self._advec_args = [self.arr, self.pk, self.bk, self.ps]
+        self._advec_args = [self.pk, self.bk, self.ps]
 
         advec_kwargs = dict(spacing=spacing, order=order,
                             fill_edge=fill_edge_lon, cyclic=cyclic_lon)
@@ -228,18 +235,21 @@ class SphereEtaUpwind(object):
         self._advec_z_kwargs = advec_kwargs
 
     def advec_x_const_p(self, u):
-        return self._X_ADVEC_CLS(u, *self._advec_args,
+        return self._X_ADVEC_CLS(u, self.arr.copy(deep=True),
+                                 *self._advec_args,
                                  **self._advec_x_kwargs).advec()
 
     def advec_y_const_p(self, v):
-        return self._Y_ADVEC_CLS(v, *self._advec_args,
+        return self._Y_ADVEC_CLS(v, self.arr.copy(deep=True),
+                                 *self._advec_args,
                                  **self._advec_y_kwargs).advec(oper='grad')
 
     def advec_horiz_const_p(self, u, v):
         return self.advec_x_const_p(u) + self.advec_y_const_p(v)
 
     def advec_z(self, omega):
-        return self._Z_ADVEC_CLS(omega, *self._advec_args,
+        return self._Z_ADVEC_CLS(omega, self.arr.copy(deep=True),
+                                 *self._advec_args,
                                  **self._advec_z_kwargs).advec()
 
     advec_p = advec_z
