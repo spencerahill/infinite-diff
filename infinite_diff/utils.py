@@ -43,7 +43,7 @@ def deep_copy(arr):
 def to_radians(arr, is_delta=False):
     """Force data with units either degrees or radians to be radians."""
     # Infer the units from embedded metadata, if it's there.
-    arr_out = deep_copy(arr)
+    arr_out = arr
     try:
         units = arr_out.units
     except AttributeError:
@@ -66,7 +66,7 @@ def to_radians(arr, is_delta=False):
 
 def add_cyclic_to_left(arr, dim, num_points, circumf):
     if not num_points:
-        return deep_copy(arr)
+        return arr
     # Make an isolated copy of the original coord values.
     arr_dim_values = arr[dim].values.copy()
     # Make an isolated copy of the whole original DataArray.
@@ -89,7 +89,7 @@ def add_cyclic_to_left(arr, dim, num_points, circumf):
 
 def add_cyclic_to_right(arr, dim, num_points, circumf):
     if not num_points:
-        return deep_copy(arr)
+        return arr
     # Make an isolated copy of the original coord values.
     arr_dim_values = arr[dim].values.copy()
     # Make an isolated copy of the whole original DataArray.
@@ -116,5 +116,5 @@ def wraparound(arr, dim, left_to_right=0, right_to_left=0,
     # TODO: Bugfix: if points on both sides are added, as written this
     # causes the points first added to the right to then be added to the left,
     # rather than the original points on the right.
-    new = deep_copy(add_cyclic_to_right(arr, dim, left_to_right, circumf))
-    return deep_copy(add_cyclic_to_left(new, dim, right_to_left, circumf))
+    new = add_cyclic_to_right(arr, dim, left_to_right, circumf)
+    return add_cyclic_to_left(new, dim, right_to_left, circumf)
