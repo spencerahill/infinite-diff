@@ -15,4 +15,5 @@ from .phys import LonFwdDeriv, LonBwdDeriv, LonCenDeriv
 from .phys import LatFwdDeriv, LatBwdDeriv, LatCenDeriv
 from .phys import EtaFwdDeriv, EtaBwdDeriv, EtaCenDeriv
 from .phys import SphereFwdDeriv, SphereBwdDeriv
-from .phys import SphereEtaDeriv, SphereEtaBwdDeriv, SphereEtaFwdDeriv
+from .phys import (SphereEtaDeriv, SphereEtaBwdDeriv, SphereEtaFwdDeriv,
+                   SphereEtaCenDeriv)
