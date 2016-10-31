@@ -1,9 +1,9 @@
 import sys
 import unittest
 
-from infinite_diff.coord import VertCoord, Eta
-from infinite_diff.geom import HorizGeom, HorizCartesian, HorizSphere
-from infinite_diff.geom import HorizVertGeom, SphereEtaGeom
+from indiff.coord import VertCoord, Eta
+from indiff.geom import (HorizGeom, HorizCartesian, HorizSphere, HorizVertGeom,
+                         SphereEtaGeom)
 
 from . import InfiniteDiffTestCase
 

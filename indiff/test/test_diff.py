@@ -5,7 +5,7 @@ from __future__ import division
 import sys
 import unittest
 
-from infinite_diff import FiniteDiff, FwdDiff, BwdDiff, CenDiff
+from indiff import FiniteDiff, FwdDiff, BwdDiff, CenDiff
 import numpy as np
 import xarray as xr
 

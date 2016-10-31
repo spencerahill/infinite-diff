@@ -1,7 +1,7 @@
 import setuptools
 
 setuptools.setup(
-    name="infinite_diff",
+    name="indiff",
     version="0.0",
     packages=setuptools.find_packages(),
     author="Spencer A. Hill",

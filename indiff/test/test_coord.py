@@ -4,10 +4,10 @@ import unittest
 
 import numpy as np
 
-from infinite_diff._constants import LON_STR, LAT_STR, PHALF_STR
-from infinite_diff.utils import to_radians
-from infinite_diff.coord import Coord, HorizCoord, XCoord, YCoord, Lon, Lat
-from infinite_diff.coord import VertCoord, ZCoord, Pressure, Sigma, Eta
+from indiff._constants import LON_STR, LAT_STR, PHALF_STR
+from indiff.utils import to_radians
+from indiff.coord import (Coord, HorizCoord, XCoord, YCoord, Lon, Lat,
+                          VertCoord, ZCoord, Pressure, Sigma, Eta)
 
 from . import InfiniteDiffTestCase
 

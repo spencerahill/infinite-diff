@@ -5,15 +5,13 @@ import unittest
 import numpy as np
 import xarray as xr
 
-from infinite_diff._constants import LAT_STR, LON_STR, PFULL_STR
-from infinite_diff.advec import (PhysUpwind, LonUpwind, LatUpwind,
-                                 SphereUpwind, EtaUpwind,
-                                 SphereEtaUpwind, LonUpwindConstP,
-                                 LatUpwindConstP)
-from infinite_diff.deriv import (PhysDeriv, LonFwdDeriv, LonBwdDeriv,
-                                 LatFwdDeriv, LatBwdDeriv,
-                                 EtaFwdDeriv, EtaBwdDeriv,
-                                 SphereEtaFwdDeriv, SphereEtaBwdDeriv)
+from indiff._constants import LAT_STR, LON_STR, PFULL_STR
+from indiff.advec import (PhysUpwind, LonUpwind, LatUpwind, SphereUpwind,
+                          EtaUpwind, SphereEtaUpwind, LonUpwindConstP,
+                          LatUpwindConstP)
+from indiff.deriv import (PhysDeriv, LonFwdDeriv, LonBwdDeriv, LatFwdDeriv,
+                          LatBwdDeriv, EtaFwdDeriv, EtaBwdDeriv,
+                          SphereEtaFwdDeriv, SphereEtaBwdDeriv)
 from . import InfiniteDiffTestCase
 
 

@@ -5,8 +5,8 @@ import unittest
 import numpy as np
 import xarray as xr
 
-from infinite_diff._constants import LON_STR
-from infinite_diff.utils import wraparound
+from indiff._constants import LON_STR
+from indiff.utils import wraparound
 
 from . import InfiniteDiffTestCase
 

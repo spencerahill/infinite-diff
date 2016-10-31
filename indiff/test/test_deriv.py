@@ -3,9 +3,8 @@ import unittest
 
 import xarray as xr
 
-from infinite_diff import FiniteDiff, OneSidedDiff, BwdDiff, FwdDiff, CenDiff
-from infinite_diff import (FiniteDeriv, OneSidedDeriv, BwdDeriv,
-                           FwdDeriv, CenDeriv)
+from indiff import (FiniteDiff, OneSidedDiff, BwdDiff, FwdDiff, CenDiff,
+                    FiniteDeriv, OneSidedDeriv, BwdDeriv, FwdDeriv, CenDeriv)
 
 from . import InfiniteDiffTestCase
 

@@ -5,8 +5,8 @@ import unittest
 import numpy as np
 import xarray as xr
 
-from infinite_diff import Advec, CenAdvec, Upwind
-from infinite_diff import FiniteDeriv, BwdDeriv, FwdDeriv, CenDeriv
+from indiff import (Advec, CenAdvec, Upwind, FiniteDeriv, BwdDeriv, FwdDeriv,
+                    CenDeriv)
 
 from . import InfiniteDiffTestCase
 

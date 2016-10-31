@@ -1,4 +1,4 @@
-"""Testing module of infinite_diff."""
+"""Testing module of infinite-diff."""
 import unittest
 
 import numpy as np

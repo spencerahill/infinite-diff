@@ -4,9 +4,9 @@ import unittest
 import numpy as np
 import xarray as xr
 
-from infinite_diff._constants import LON_STR, LAT_STR, PFULL_STR
-from infinite_diff.utils import wraparound
-from infinite_diff.deriv import (
+from indiff._constants import LON_STR, LAT_STR, PFULL_STR
+from indiff.utils import wraparound
+from indiff.deriv import (
     PhysDeriv, LonDeriv, LatDeriv, SphereEtaDeriv,
     LonFwdDeriv, LatFwdDeriv, EtaFwdDeriv, SphereFwdDeriv,
     LonBwdDeriv, LatBwdDeriv, EtaBwdDeriv, SphereBwdDeriv,

@@ -33,7 +33,7 @@ def deep_copy(arr):
     arr_values = arr_copy.values.copy()
     new_dims = arr_copy.dims
     coords = arr_copy.coords.to_dataset().copy(deep=True)
-    new_coords = {key: _arr_deep_copy(val) for key, val in coords.iteritems()}
+    new_coords = {key: _arr_deep_copy(val) for key, val in coords.items()}
     arr_props = {prop: getattr(arr_copy, prop) for prop in
                  ['name', 'attrs', 'encoding']}
     return xr.DataArray(arr_values, dims=new_dims, coords=new_coords,
